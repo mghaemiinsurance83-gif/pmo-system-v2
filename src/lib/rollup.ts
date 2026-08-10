@@ -115,9 +115,21 @@ export async function buildOrgTree(): Promise<OrgNode[]> {
   }
   for (const r of roots) rollup(r);
 
-  // sort children by level then name
+  // sort children: group by org type first (company → deputy/center → management → group/other)
+  // then by name within each group. This keeps deputies above independent managements.
+  function typeOrder(t: string): number {
+    if (t === "COMPANY") return 0;
+    if (t === "DEPUTY" || t === "CENTER") return 1;
+    if (t === "MANAGEMENT") return 2;
+    return 3; // GROUP, UNIT, DEPARTMENT, OTHER
+  }
   function sortChildren(node: OrgNode) {
-    node.children.sort((a, b) => a.name.localeCompare(b.name, "fa"));
+    node.children.sort((a, b) => {
+      const ta = typeOrder(a.orgType);
+      const tb = typeOrder(b.orgType);
+      if (ta !== tb) return ta - tb;
+      return a.name.localeCompare(b.name, "fa");
+    });
     node.childCount = node.children.length;
     for (const c of node.children) sortChildren(c);
   }

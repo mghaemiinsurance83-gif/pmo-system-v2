@@ -59,92 +59,124 @@ interface OrgNode {
 
 const COMPANY = "بیمه تجارت‌نو";
 
-const ORG_TREE: OrgNode[] = [
-  { code: "CO", name: COMPANY, type: "COMPANY", level: 0 },
+// ─── Hand-curated aliases keyed by canonical management name ─────────────────
+// Keys MUST match the management names in the "معاونت ها ومدیریت های زیرمجموعه"
+// sheet exactly. These augment the synonym file (نام نظیر مدیریت ها.xlsx) for
+// robust executor matching when importing task rows.
+const MANAGEMENT_ALIASES: Record<string, string[]> = {
+  "امور شعب و نمایندگان": ["امور شعب", "امورشعب", "شعب", "نمایندگان", "مدیریت امور شعب", "مدیریت امور شعب و نمایندگان", "مدیریت امور شعبو نمایندگان", "امور شعب-معاونت توسعه بازار"],
+  "بازاریابی و مناقصات": ["بازاریابی", "مدیریت بازاریابی", "مدیریت بازریابی", "مناقصات", "منقصات", "بازاریابی-معاونت توسعه بازار"],
+  "امور مشتریان": ["امورمشتریان", "مشتریان"],
+  "مرکز بانک - بیمه": ["بانک بیمه", "بانک-بیمه", "بانک وبیمه", "مدیریت بانک وبیمه", "مدیریت بانک", "بانک"],
+  "کسب و کارهای نوین": ["کسب و کار", "کسب وکار", "کسب", "کار", "کارنوین", "کار نوین", "کارهای نوین", "نوآوری", "مرکز نوآوری"],
+  "بیمه های آتش سوزی": ["آتش سوزی", "آتش‌سوزی"],
+  "بیمه های اتومبیل": ["اتومبیل", "فنی اتومبیل", "مدیریت بیمه های اتومبیل", "مدیریت بیمه‌های اتومبیل", "مدیریت های اتومبیل"],
+  "بیمه های مهندسی و انرژی": ["مهندسی", "انرژی", "مدیرت مهندسی", "مدیریت مهندسی", "مدیریت مهندسی وانرژی"],
+  "بیمه های باربری، هواپیما و کشتی": ["باربری", "هواپیما", "کشتی", "مدیریت باربری", "مدیریت بیمه های باربری کشتی و هواپیما"],
+  "مسئولیت و طرح های خاص": ["مسئولیت", "مدیریت مسئولیت"],
+  "بیمه های عمر، حوادث و درمان": ["درمان", "مدیریت درمان", "حوادث", "عمر حوادث درمان"],
+  "بیمه های عمر و سرمایه گذاری": ["عمر و سرمایه گذاری", "عمر وسرمایه گذاری", "عمر", "مدیریت عمر", "مدیریت بیمه های عمر", "مدیریت  بیمه های عمر", "بیمه های عمروسرمایه گذاری", "مدیریت بیمه های عمروسرمایه گذاری"],
+  "بیمه های اتکائی و بین الملل": ["اتکائی", "اتکایی", "مدیریت اتکائی", "مدیریت اتکایی", "اتکایی و امور بین الملل", "اتکایی و اموربین الملل"],
+  "امور مالی": ["مالی", "مدیریت مالی", "امور مالی"],
+  "مدیریت سرمایه گذاری": ["سرمایه گذاری", "مدیریت  سرمایه گذاری", "مدیریت سرمایه گذاری", "سرمایه گذاری "],
+  "حسابرسی داخلی": ["حسابرسی", "حسابرسی داخلی", "تطبیق مقررات", "مدیریت حسابرسی داخلی", "مدیریت حسابرسی داخلی و تطبیق مقررات"],
+  "منابع انسانی": ["سرمایه انسانی", "مدیریت منابع انسانی"],
+  "آموزش": ["اموزش", "اداره آموزش", "واحد آموزش"],
+  "فناوری اطلاعات": ["فاوا", "آی تی", "ای تی", "IT", "فن آوری اطلاعات", "فناروری اطلاعات", "مدیریت فناوری اطلاعات", "معاونت فناوری اطلاعات", "اطلاعات", "مالی IT", "نمایندگان IT"],
+  "طرح و برنامه": ["طرح", "طرح برنامه", "مدیرت طرح و برنامه", "مدیریت طرح", "مدیریت طرح وبرنامه", "مدیریت طرح و برنامه", "برنامه"],
+  "تشکیلات و روشها": ["تشکیلات", "روش ها", "روش\u200cها", "مدیریت تشکیلات", "مدیریت تشکیلات‌وروش‌ها", "مدیریت تشکیلات و روش ها", "مدیریت تشکیل روش ها", "مدیرت تشکیلات و روش ها"],
+  "پشتیبانی": ["مدیریت پشتیبانی", "مدیریت پیشتیبانی", "مدیریت پشتیبانی _فن آوری"],
+  "روابط عمومی و ارتباطات": ["روابط عمومی", "مدیریت روابط عمومی"],
+  "حراست": [],
+  "حقوقی و امور قراردادها": ["حقوقی", "امور حقوقی", "مدیریت حقوقی", "امور قراردادها", "قراردادها", "مدیریت‌های حقوقی", "حقوقی-امور حقوقی و قرارداد ها"],
+  "ریسک و اکچوئری": ["ریسک", "مدیریت ریسک", "اکچوئری", "اکچوئر رسمی", "اکچووری"],
+  "بازرسی و پیگیریهای ویژه": ["بازرسی", "مدیریت بازرسی", "بازرسی ویژه", "مدیریت بازرسی ویژه", "پیگیری", "پیگیری های ویژه", "پیگیری ویژه", "مدیریت بازرسی وحقوقی", "بازرسی-بازرسی ویژه و پیگیری"],
+  "مبارزه با پولشویی و تامین مالی تروریسم": ["پولشویی", "مبارزه با پولشویی", "مدیریت مبارزه با پولشویی", "واحد مبارزه با پولشویی", "تأمین مالی تروریسم", "واحد مبارزه با پولشویی_ واحد آموزش", "تأمین مالی تروریسم_ مدیریت فناوری اطلاعات", "تأمین مالی تروریسم_ مدیریت\u200cتشکیلات", "واحد مبارزه با پولشویی و تاًمین مالی تروریسم", "مبارزه با پولشویی-مبارزه با پولشویی تامین مالی و تروریسم"],
+};
 
-  // Deputies
-  { code: "DEP-MARKET", name: "معاونت توسعه بازار و شبکه فروش", type: "DEPUTY", level: 1, parentCode: "CO",
-    aliases: ["معاونت توسعه بازار", "توسعه بازار", "معاونت توسعه بازار و شبکه فروش"] },
-  { code: "DEP-TECH", name: "معاونت فنی اموال و اشخاص", type: "DEPUTY", level: 1, parentCode: "CO" },
-  { code: "DEP-FIN", name: "معاونت مالی و سرمایه‌گذاری", type: "DEPUTY", level: 1, parentCode: "CO" },
-  { code: "DEP-HR", name: "معاونت منابع انسانی", type: "DEPUTY", level: 1, parentCode: "CO" },
-  { code: "DEP-IT", name: "معاونت فناوری", type: "DEPUTY", level: 1, parentCode: "CO" },
-  { code: "DEP-ORG", name: "معاونت سازمان و پشتیبانی", type: "DEPUTY", level: 1, parentCode: "CO" },
+// Generic catch-all aliases that don't map to a single real management
+// (e.g. "تمامی مدیریت‌ها", "مدیریت‌های فنی", "حوزه مدیرعامل").
+const GENERIC_GROUP_ALIASES: string[] = ["تمامی مدیریت ها", "تمامی مدیریت های ستادی", "کلیه مدیریت ها", "کلیه مدیریت\u200cها", "سایر مدیریت ها", "مدیریت\u200cها", "مدیریت‌های فنی", "مدیریت های فنی", "مدیران فنی", "فنی", "مدیرت های فنی", "مدیریتهای فنی", "حوزه مدیرعامل", "حوزه مدیر عامل"];
 
-  // Market deputy children
-  { code: "M-SHOBA", name: "امور شعب و نمایندگان", type: "MANAGEMENT", level: 2, parentCode: "DEP-MARKET",
-    aliases: ["امور شعب", "امورشعب", "شعب", "نمایندگان", "مدیریت امور شعب", "مدیریت امور شعب و نمایندگان", "مدیریت امور شعبو نمایندگان", "امور شعب-معاونت توسعه بازار"] },
-  { code: "M-MKT", name: "بازاریابی و مناقصات", type: "MANAGEMENT", level: 2, parentCode: "DEP-MARKET",
-    aliases: ["بازاریابی", "مدیریت بازاریابی", "مدیریت بازریابی", "مناقصات", "منقصات", "بازاریابی-معاونت توسعه بازار"] },
-  { code: "M-CUST", name: "امور مشتریان", type: "MANAGEMENT", level: 2, parentCode: "DEP-MARKET",
-    aliases: ["امورمشتریان", "مشتریان"] },
-  { code: "M-BANKINS", name: "مرکز بانک-بیمه", type: "MANAGEMENT", level: 2, parentCode: "DEP-MARKET",
-    aliases: ["بانک بیمه", "بانک-بیمه", "بانک وبیمه", "مدیریت بانک وبیمه", "مدیریت بانک", "بانک"] },
-  { code: "M-NEWBIZ", name: "کسب و کارهای نوین", type: "MANAGEMENT", level: 2, parentCode: "DEP-MARKET",
-    aliases: ["کسب و کار", "کسب وکار", "کسب", "کار", "کارنوین", "کار نوین", "کارهای نوین", "نوآوری", "مرکز نوآوری"] },
+interface OrgGroup { name: string; managements: string[] }
 
-  // Technical deputy children
-  { code: "M-FIRE", name: "بیمه های آتش سوزی", type: "MANAGEMENT", level: 2, parentCode: "DEP-TECH",
-    aliases: ["آتش سوزی", "آتش‌سوزی"] },
-  { code: "M-AUTO", name: "بیمه های اتومبیل", type: "MANAGEMENT", level: 2, parentCode: "DEP-TECH",
-    aliases: ["اتومبیل", "فنی اتومبیل", "مدیریت بیمه های اتومبیل", "مدیریت بیمه‌های اتومبیل", "مدیریت های اتومبیل"] },
-  { code: "M-ENG", name: "بیمه های مهندسی و انرژی", type: "MANAGEMENT", level: 2, parentCode: "DEP-TECH",
-    aliases: ["مهندسی", "انرژی", "مدیرت مهندسی", "مدیریت مهندسی", "مدیریت مهندسی وانرژی"] },
-  { code: "M-CARGO", name: "بیمه های باربری، هواپیما و کشتی", type: "MANAGEMENT", level: 2, parentCode: "DEP-TECH",
-    aliases: ["باربری", "هواپیما", "کشتی", "مدیریت باربری", "مدیریت بیمه های باربری کشتی و هواپیما"] },
-  { code: "M-LIAB", name: "مسئولیت و طرح های خاص", type: "MANAGEMENT", level: 2, parentCode: "DEP-TECH",
-    aliases: ["مسئولیت", "مدیریت مسئولیت"] },
-  { code: "M-HEALTH", name: "بیمه های عمر، حوادث و درمان", type: "MANAGEMENT", level: 2, parentCode: "DEP-TECH",
-    aliases: ["درمان", "مدیریت درمان", "حوادث", "عمر حوادث درمان"] },
-  { code: "M-LIFE", name: "بیمه های عمر و سرمایه گذاری", type: "MANAGEMENT", level: 2, parentCode: "DEP-TECH",
-    aliases: ["عمر و سرمایه گذاری", "عمر وسرمایه گذاری", "عمر", "مدیریت عمر", "مدیریت بیمه های عمر", "مدیریت  بیمه های عمر", "بیمه های عمروسرمایه گذاری", "مدیریت بیمه های عمروسرمایه گذاری"] },
-  { code: "M-REINS", name: "بیمه های اتکائی و بین الملل", type: "MANAGEMENT", level: 2, parentCode: "DEP-TECH",
-    aliases: ["اتکائی", "اتکایی", "مدیریت اتکائی", "مدیریت اتکایی", "اتکایی و امور بین الملل", "اتکایی و اموربین الملل"] },
+// Read the org structure from the "معاونت ها ومدیریت های زیرمجموعه" sheet.
+// Column A = deputy/section header (blank cell = continuation of previous),
+// Column B = management name. The header "مدیریت های مستقل" marks the start of
+// independent managements that are NOT under any deputy (they report directly
+// to the company).
+function readOrgStructure(wb: ExcelJS.Workbook): { deputies: OrgGroup[]; independents: string[] } {
+  const ws = wb.getWorksheet("معاونت ها ومدیریت های زیرمجموعه");
+  if (!ws) throw new Error('Sheet "معاونت ها ومدیریت های زیرمجموعه" not found in workbook');
+  const deputies: OrgGroup[] = [];
+  const independents: string[] = [];
+  let current: OrgGroup | null = null;
+  let independentMode = false;
+  // exceljs repeats the master value for every row inside a merged range, so we
+  // deduplicate by tracking the previous value and only reacting to changes.
+  let prevA = "";
+  let prevB = "";
+  for (let r = 2; r <= ws.rowCount; r++) {
+    const a = cellText(ws.getCell(r, 1).value).trim();
+    const b = cellText(ws.getCell(r, 2).value).trim();
+    const aChanged = a !== "" && a !== prevA;
+    const bChanged = b !== "" && b !== prevB;
+    if (aChanged) {
+      if (a.includes("مستقل")) {
+        independentMode = true;
+        current = null;
+      } else {
+        independentMode = false;
+        current = { name: a, managements: [] };
+        deputies.push(current);
+      }
+    }
+    if (bChanged) {
+      if (independentMode) {
+        if (!independents.includes(b)) independents.push(b);
+      } else if (current) {
+        if (!current.managements.includes(b)) current.managements.push(b);
+      }
+    }
+    prevA = a;
+    prevB = b;
+  }
+  return { deputies, independents };
+}
 
-  // Finance deputy children
-  { code: "M-FIN", name: "امور مالی", type: "MANAGEMENT", level: 2, parentCode: "DEP-FIN",
-    aliases: ["مالی", "مدیریت مالی", "امور مالی"] },
-  { code: "M-INVEST", name: "مدیریت سرمایه گذاری", type: "MANAGEMENT", level: 2, parentCode: "DEP-FIN",
-    aliases: ["سرمایه گذاری", "مدیریت  سرمایه گذاری", "مدیریت سرمایه گذاری", "سرمایه گذاری "] },
-  { code: "M-AUDIT", name: "حسابرسی داخلی", type: "MANAGEMENT", level: 2, parentCode: "DEP-FIN",
-    aliases: ["حسابرسی", "حسابرسی داخلی", "تطبیق مقررات", "مدیریت حسابرسی داخلی", "مدیریت حسابرسی داخلی و تطبیق مقررات"] },
+// Build the flat ORG_TREE list (codes + parent links) from the parsed structure.
+// Hierarchy: Company → Deputy → Management, plus independent Managements that
+// report directly to the Company. A generic GROUP node is appended for catch-all
+// executor references ("تمامی مدیریت‌ها", …).
+function buildOrgTreeData(structure: { deputies: OrgGroup[]; independents: string[] }): OrgNode[] {
+  const tree: OrgNode[] = [];
+  tree.push({ code: "CO", name: COMPANY, type: "COMPANY", level: 0 });
+  let depIdx = 1;
+  let mIdx = 1;
+  for (const dep of structure.deputies) {
+    const depCode = `DEP-${String(depIdx).padStart(2, "0")}`;
+    // "مرکز فناوری و نوآوری" is a center at the deputy level.
+    const depType = dep.name.startsWith("مرکز") ? "CENTER" : "DEPUTY";
+    tree.push({ code: depCode, name: dep.name, type: depType, level: 1, parentCode: "CO" });
+    depIdx++;
+    for (const m of dep.managements) {
+      const mCode = `M-${String(mIdx).padStart(3, "0")}`;
+      tree.push({ code: mCode, name: m, type: "MANAGEMENT", level: 2, parentCode: depCode, aliases: MANAGEMENT_ALIASES[m] || [] });
+      mIdx++;
+    }
+  }
+  // Independent managements → directly under the company (no deputy parent)
+  for (const m of structure.independents) {
+    const mCode = `M-${String(mIdx).padStart(3, "0")}`;
+    tree.push({ code: mCode, name: m, type: "MANAGEMENT", level: 1, parentCode: "CO", aliases: MANAGEMENT_ALIASES[m] || [] });
+    mIdx++;
+  }
+  // Generic group node for catch-all executor references
+  tree.push({ code: "G-ALL", name: "تمامی مدیریت‌های ستادی", type: "GROUP", level: 1, parentCode: "CO", aliases: GENERIC_GROUP_ALIASES });
+  return tree;
+}
 
-  // HR deputy children
-  { code: "M-HR", name: "منابع انسانی", type: "MANAGEMENT", level: 2, parentCode: "DEP-HR",
-    aliases: ["سرمایه انسانی", "مدیریت منابع انسانی"] },
-  { code: "M-TRAIN", name: "آموزش", type: "MANAGEMENT", level: 2, parentCode: "DEP-HR",
-    aliases: ["اموزش", "اداره آموزش", "واحد آموزش"] },
-
-  // IT deputy
-  { code: "M-IT", name: "فناوری اطلاعات", type: "MANAGEMENT", level: 2, parentCode: "DEP-IT",
-    aliases: ["فاوا", "آی تی", "ای تی", "IT", "فن آوری اطلاعات", "فناروری اطلاعات", "مدیریت فناوری اطلاعات", "معاونت فناوری اطلاعات", "اطلاعات", "مالی IT", "نمایندگان IT"] },
-
-  // Org & support deputy children
-  { code: "M-PLAN", name: "طرح و برنامه", type: "MANAGEMENT", level: 2, parentCode: "DEP-ORG",
-    aliases: ["طرح", "طرح برنامه", "مدیرت طرح و برنامه", "مدیریت طرح", "مدیریت طرح وبرنامه", "مدیریت طرح و برنامه", "برنامه"] },
-  { code: "M-ORG", name: "تشکیلات و روشها", type: "MANAGEMENT", level: 2, parentCode: "DEP-ORG",
-    aliases: ["تشکیلات", "روش ها", "روش\u200cها", "مدیریت تشکیلات", "مدیریت تشکیلات‌وروش‌ها", "مدیریت تشکیلات و روش ها", "مدیریت تشکیل روش ها", "مدیرت تشکیلات و روش ها"] },
-  { code: "M-SUPP", name: "پشتیبانی", type: "MANAGEMENT", level: 2, parentCode: "DEP-ORG",
-    aliases: ["مدیریت پشتیبانی", "مدیریت پیشتیبانی", "مدیریت پشتیبانی _فن آوری"] },
-  { code: "M-PR", name: "روابط عمومی و ارتباطات", type: "MANAGEMENT", level: 2, parentCode: "DEP-ORG",
-    aliases: ["روابط عمومی", "مدیریت روابط عمومی"] },
-  { code: "M-SEC", name: "حراست", type: "MANAGEMENT", level: 2, parentCode: "DEP-ORG",
-    aliases: [] },
-
-  // Standalone (report to company)
-  { code: "M-LEGAL", name: "حقوقی و امور قراردادها", type: "MANAGEMENT", level: 2, parentCode: "CO",
-    aliases: ["حقوقی", "امور حقوقی", "مدیریت حقوقی", "امور قراردادها", "قراردادها", "مدیریت‌های حقوقی", "حقوقی-امور حقوقی و قرارداد ها"] },
-  { code: "M-RISK", name: "ریسک و اکچوئری", type: "MANAGEMENT", level: 2, parentCode: "CO",
-    aliases: ["ریسک", "مدیریت ریسک", "اکچوئری", "اکچوئر رسمی", "اکچووری"] },
-  { code: "M-INSP", name: "بازرسی و پیگیریهای ویژه", type: "MANAGEMENT", level: 2, parentCode: "CO",
-    aliases: ["بازرسی", "مدیریت بازرسی", "بازرسی ویژه", "مدیریت بازرسی ویژه", "پیگیری", "پیگیری های ویژه", "پیگیری ویژه", "مدیریت بازرسی وحقوقی", "بازرسی-بازرسی ویژه و پیگیری"] },
-  { code: "M-AML", name: "مبارزه با پولشویی و تامین مالی تروریسم", type: "MANAGEMENT", level: 2, parentCode: "CO",
-    aliases: ["پولشویی", "مبارزه با پولشویی", "مدیریت مبارزه با پولشویی", "واحد مبارزه با پولشویی", "تأمین مالی تروریسم", "واحد مبارزه با پولشویی_ واحد آموزش", "تأمین مالی تروریسم_ مدیریت فناوری اطلاعات", "تأمین مالی تروریسم_ مدیریت\u200cتشکیلات", "واحد مبارزه با پولشویی و تاًمین مالی تروریسم", "مبارزه با پولشویی-مبارزه با پولشویی تامین مالی و تروریسم"] },
-
-  // Special: "all managements" / generic references
-  { code: "G-ALL", name: "تمامی مدیریت‌های ستادی", type: "GROUP", level: 3, parentCode: "CO",
-    aliases: ["تمامی مدیریت ها", "تمامی مدیریت های ستادی", "کلیه مدیریت ها", "کلیه مدیریت\u200cها", "سایر مدیریت ها", "مدیریت\u200cها", "مدیریت‌های فنی", "مدیریت های فنی", "مدیران فنی", "فنی", "مدیرت های فنی", "مدیریتهای فنی", "حوزه مدیرعامل", "حوزه مدیر عامل"] },
-];
+let ORG_TREE: OrgNode[] = [];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function j2g(jy: number, jm: number, jd: number): Date {
@@ -265,8 +297,18 @@ async function main() {
     await db.statusDictionary.create({ data: { statusCode: s.code, statusName: s.name, entityType: s.entity, color: s.color } });
   }
 
-  // 3. Build org tree
-  console.log("🏢 Building organization hierarchy...");
+  // 3. Read main Excel & build org tree from the structure sheet
+  console.log("📊 Reading main programs Excel...");
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile("/home/z/my-project/upload/(v27-1) برنامه عملیاتی های 1405.xlsx");
+  console.log(`   ${wb.worksheets.length} sheets found`);
+
+  console.log("🏢 Building organization hierarchy from structure sheet...");
+  const orgStructure = readOrgStructure(wb);
+  ORG_TREE = buildOrgTreeData(orgStructure);
+  const depMgts = orgStructure.deputies.reduce((s, d) => s + d.managements.length, 0);
+  console.log(`   ${orgStructure.deputies.length} deputies, ${depMgts} managements under deputies, ${orgStructure.independents.length} independent managements`);
+
   const orgIdByCode = new Map<string, string>();
   // create root first
   for (const node of ORG_TREE) {
@@ -345,11 +387,8 @@ async function main() {
   await new Promise((r) => setTimeout(r, 500));
   console.log(`   Augmented with synonym file entries`);
 
-  // 6. Read main Excel
-  console.log("📊 Reading main programs Excel...");
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile("/home/z/my-project/upload/(v27-1) برنامه عملیاتی های 1405.xlsx");
-  console.log(`   ${wb.worksheets.length} sheets found`);
+  // 6. Import program sheets (workbook already read in step 3)
+  console.log("📊 Importing program sheets...");
 
   // Create import batch
   const batch = await db.importBatch.create({

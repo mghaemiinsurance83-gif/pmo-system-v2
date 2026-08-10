@@ -62,6 +62,7 @@ interface ProjectDetail {
 const ORG_TYPE_ICON: Record<string, React.ElementType> = {
   COMPANY: Building2,
   DEPUTY: Layers,
+  CENTER: Layers,
   MANAGEMENT: FolderKanban,
   UNIT: FolderKanban,
   GROUP: FolderKanban,
@@ -70,6 +71,7 @@ const ORG_TYPE_ICON: Record<string, React.ElementType> = {
 const ORG_TYPE_LABEL: Record<string, string> = {
   COMPANY: "شرکت",
   DEPUTY: "معاونت",
+  CENTER: "مرکز",
   MANAGEMENT: "مدیریت",
   UNIT: "واحد",
   GROUP: "گروه",
