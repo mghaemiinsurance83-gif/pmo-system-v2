@@ -12,12 +12,11 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  LineChart,
-  Line,
   Legend,
   Area,
   AreaChart,
   Cell,
+  ReferenceLine,
 } from "recharts";
 import { cn } from "@/lib/utils";
 
@@ -96,10 +95,10 @@ export function DashboardView() {
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <KpiCard label="پیشرفت کلی شرکت" value={faPercent(kpis.overallProgress)} accent="teal" icon={<TrendingUp className="h-5 w-5" />} hint="وزنی Roll-up" />
-        <KpiCard label="تعداد برنامه‌ها" value={kpis.totalProjects} accent="violet" icon={<FolderKanban className="h-5 w-5" />} hint={`سال ${toFa(kpis.totalProjects ? 1405 : 1405)}`} />
+        <KpiCard label="تعداد برنامه‌ها" value={kpis.totalProjects} accent="violet" icon={<FolderKanban className="h-5 w-5" />} hint="سال ۱۴۰۵" />
         <KpiCard label="تعداد فعالیت‌ها" value={kpis.totalTasks} accent="amber" icon={<Activity className="h-5 w-5" />} hint="در همه برنامه‌ها" />
         <KpiCard label="مدیریت‌های متولی" value={kpis.totalManagements} accent="emerald" icon={<Building2 className="h-5 w-5" />} hint="واحد سازمانی" />
-        <KpiCard label="معاونت‌ها + مستقل" value={`${toFa(kpis.totalDeputies)}+${toFa(kpis.totalIndependents)}`} accent="rose" icon={<Network className="h-5 w-5" />} hint={`${toFa(kpis.totalDeputies)} معاونت، ${toFa(kpis.totalIndependents)} مدیریت مستقل`} />
+        <KpiCard label="کل واحدهای سازمانی" value={kpis.totalDeputies + kpis.totalIndependents} accent="rose" icon={<Network className="h-5 w-5" />} hint={`${toFa(kpis.totalDeputies)} معاونت + ${toFa(kpis.totalIndependents)} مستقل`} />
         <KpiCard label="میانگین پیشرفت" value={faPercent(kpis.avgProgress)} accent="teal" icon={<CheckCircle2 className="h-5 w-5" />} hint="ساده (غیروزنی)" />
       </div>
 
@@ -132,11 +131,18 @@ export function DashboardView() {
                   contentStyle={{ fontFamily: "inherit", fontSize: 12, borderRadius: 8, border: "1px solid oklch(0.9 0 0)" }}
                 />
                 <Legend formatter={(v) => (v === "planned" ? "برنامه‌ریزی‌شده" : "واقعی")} wrapperStyle={{ fontSize: 12 }} />
+                {/* Reference-month vertical marker — "today" on the timeline */}
+                {data.referenceMonth && data.trend.find((t) => Number(t.monthIdx) === data.referenceMonth) && (
+                  <ReferenceLine x={data.trend.find((t) => Number(t.monthIdx) === data.referenceMonth)!.month} stroke="#6366f1" strokeDasharray="5 5" strokeWidth={1.5} label={{ value: `امروز: ${toFa(data.referenceMonth)}`, position: "top", fill: "#6366f1", fontSize: 10 }} />
+                )}
                 <Area type="monotone" dataKey="planned" stroke="#14b8a6" strokeWidth={2} fill="url(#gPlanned)" />
                 <Area type="monotone" dataKey="actual" stroke="#f59e0b" strokeWidth={2} fill="url(#gActual)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
+          {data.referenceMonth && (
+            <p className="mt-1 text-[10px] text-muted-foreground">خط نقطه‌چین نیلی = ماه مرجع (امروز). پیشرفت واقعی پس از این ماه هنوز ثبت نشده است.</p>
+          )}
         </SectionCard>
 
         <SectionCard title="توزیع وضعیت برنامه‌ها" description={`${toFa(totalStatusItems)} برنامه — بر اساس تاریخ مرجع ${data.referenceLabel || ""}`}>
@@ -211,9 +217,9 @@ export function DashboardView() {
 
       {/* Low progress projects */}
       <SectionCard title="برنامه‌های نیازمند توجه" description={`کمترین پیشرفت در میان ${toFa(kpis.totalProjects)} برنامه — بر اساس تاریخ مرجع ${data.referenceLabel || ""}`} bodyClassName="p-0">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-96 overflow-y-auto custom-scroll">
           <table className="w-full text-right text-sm">
-            <thead className="bg-muted/50 text-xs text-muted-foreground">
+            <thead className="bg-muted/50 text-xs text-muted-foreground sticky top-0">
               <tr>
                 <th className="px-4 py-2.5 font-medium">کد برنامه</th>
                 <th className="px-4 py-2.5 font-medium">عنوان</th>

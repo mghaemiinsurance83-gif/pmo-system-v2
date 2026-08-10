@@ -112,8 +112,8 @@ export function SectionCard({
       {(title || actions) && (
         <header className="flex items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            {title && <h3 className="text-sm font-semibold text-foreground truncate">{title}</h3>}
-            {description && <p className="mt-0.5 text-xs text-muted-foreground truncate">{description}</p>}
+            {title && <h3 className="text-sm font-semibold text-foreground truncate" title={title}>{title}</h3>}
+            {description && <p className="mt-0.5 text-xs text-muted-foreground truncate" title={description}>{description}</p>}
           </div>
           {actions && <div className="shrink-0">{actions}</div>}
         </header>

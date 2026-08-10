@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { apiFetch } from "@/lib/api";
 import {
   SectionCard,
@@ -12,7 +12,6 @@ import {
 import { toFa, faPercent, PERSIAN_MONTHS, statusColor } from "@/lib/jalali";
 import { cn } from "@/lib/utils";
 import {
-  Building2,
   FolderKanban,
   Handshake,
   Crown,
@@ -37,13 +36,6 @@ import {
 } from "@/components/ui/select";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-interface OrgItem {
-  id: string;
-  name: string;
-  group: string;
-  kind: "DEPUTY" | "MANAGEMENT";
-}
-
 interface StepExecutor {
   orgId: string;
   name: string;
@@ -153,37 +145,24 @@ export function CollaborationView() {
       .catch((e) => setTreeError(e.message));
   }, []);
 
-  // Build a flat org list for the selector (deputies aggregate their children)
-  const orgItems: OrgItem[] = useMemo(() => {
-    if (!tree) return [];
-    const items: OrgItem[] = [];
-    tree.deputies.forEach((d) => {
-      items.push({ id: d.id, name: d.name, group: "معاونت‌ها (جمع کل زیرمجموعه)", kind: "DEPUTY" });
-      d.managements.forEach((m) => {
-        items.push({ id: m.id, name: m.name, group: `زیرمجموعه ${d.name}`, kind: "MANAGEMENT" });
-      });
-    });
-    tree.independents.forEach((m) => {
-      items.push({ id: m.id, name: m.name, group: "مدیریت‌های مستقل", kind: "MANAGEMENT" });
-    });
-    return items;
-  }, [tree]);
-
   // Signature-based fetch: one state object keyed by the input signature, with a
   // stale-request guard. All setState happens inside async callbacks (never
   // synchronously in the effect body), so this complies with the
   // react-hooks/set-state-in-effect rule.
   const [result, setResult] = useState<{ sig: string; data?: CollabResponse; error?: string } | null>(null);
   const reqRef = useRef(0);
-  const sig = `${orgId}|${period}|${fromMonth}|${toMonth}|${season}`;
+  // Clamp so from <= to (avoid empty/inverted ranges silently producing nonsense)
+  const effFrom = period === "monthly" ? Math.min(fromMonth, toMonth) : fromMonth;
+  const effTo = period === "monthly" ? Math.max(fromMonth, toMonth) : toMonth;
+  const sig = `${orgId}|${period}|${effFrom}|${effTo}|${season}`;
 
   useEffect(() => {
     if (!orgId) return;
     const myReq = ++reqRef.current;
     const params = new URLSearchParams({ orgId, period });
     if (period === "monthly") {
-      params.set("from", String(fromMonth));
-      params.set("to", String(toMonth));
+      params.set("from", String(effFrom));
+      params.set("to", String(effTo));
     } else {
       params.set("season", season);
     }
@@ -238,7 +217,7 @@ export function CollaborationView() {
 
           {/* Selectors */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Org selector */}
+            {/* Org selector — grouped: deputies (aggregate) / child managements / independents */}
             <div className="lg:col-span-2">
               <label className="mb-1 block text-[11px] font-medium text-muted-foreground">انتخاب معاونت / مدیریت</label>
               <Select value={orgId || undefined} onValueChange={setOrgId}>
@@ -246,14 +225,23 @@ export function CollaborationView() {
                   <SelectValue placeholder="یک معاونت یا مدیریت انتخاب کنید…" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>معاونت‌ها و مدیریت‌ها</SelectLabel>
-                    {orgItems.map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        <span className="text-xs text-muted-foreground ml-1">{o.group}:</span> {o.name}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
+                  {tree.deputies.map((d) => (
+                    <SelectGroup key={d.id}>
+                      <SelectLabel className="text-teal-700 dark:text-teal-300">{d.name} (جمع زیرمجموعه)</SelectLabel>
+                      <SelectItem value={d.id}>{d.name} — کل زیرمجموعه</SelectItem>
+                      {d.managements.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>↳ {m.name}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                  {tree.independents.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel className="text-violet-700 dark:text-violet-300">مدیریت‌های مستقل</SelectLabel>
+                      {tree.independents.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -348,11 +336,12 @@ export function CollaborationView() {
             hint="سهم این واحد از کل وزن برنامه‌ها در بازه"
           />
           <KpiCard
-            label="واحد انتخاب‌شده"
-            value={current.unit.isDeputy ? "معاونت" : "مدیریت"}
-            icon={<Building2 className="h-5 w-5" />}
+            label="مجموع مشارکت در پیشرفت"
+            value={toFa(Math.round(current.summary.totalProgressContribution * 10) / 10)}
+            unit="نقطه"
+            icon={<TrendingUp className="h-5 w-5" />}
             accent="rose"
-            hint={current.unit.name}
+            hint={`مجموع نقاط پیشرفت در ${toFa(current.summary.collaboratingPrograms)} برنامه`}
           />
         </div>
       )}
@@ -438,7 +427,6 @@ function ProgramRow({
   isOpen: boolean;
   onToggle: () => void;
 }) {
-  const c = statusColor(program.status);
   const inRangeSteps = program.steps.filter((s) => s.inRange);
   const outOfRangeSteps = program.steps.filter((s) => !s.inRange);
 
@@ -472,9 +460,9 @@ function ProgramRow({
             <span>گام‌های همکاری در بازه: <b className="text-foreground">{toFa(program.inRangeStepCount)}</b> از {toFa(program.totalStepCount)}</span>
           </div>
         </div>
-        {/* share badge */}
+        {/* share badge — neutral teal palette so it reads as "share" not "status" */}
         <div className="shrink-0 text-left">
-          <div className={cn("inline-flex flex-col items-end rounded-lg border px-3 py-1.5", c.badge)}>
+          <div className="inline-flex flex-col items-end rounded-lg border border-teal-200/60 dark:border-teal-900/40 bg-teal-50 dark:bg-teal-950/30 px-3 py-1.5 text-teal-700 dark:text-teal-300">
             <span className="text-[10px] opacity-80">سهم مشارکت</span>
             <span className="text-base font-bold tabular-nums">{faPercent(program.mySharePercent)}</span>
           </div>
@@ -538,7 +526,7 @@ function StepRow({ step, unitName, dimmed }: { step: CollabStep; unitName: strin
         <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-bold tabular-nums text-muted-foreground">
           {toFa(step.sequenceNo)}
         </span>
-        <div className="flex-1 min-w0">
+        <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-medium text-foreground leading-snug">{step.taskName}</span>
             <StatusBadge status={step.status} className="scale-90" />

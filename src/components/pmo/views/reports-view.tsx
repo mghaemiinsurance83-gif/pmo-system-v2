@@ -254,7 +254,7 @@ export function ReportsView() {
             value={toFa(k.spi)}
             icon={<Gauge className="h-5 w-5" />}
             accent={k.spi >= 0.9 ? "emerald" : k.spi >= 0.7 ? "amber" : "rose"}
-            hint={k.spi >= 1 ? "Ahead of schedule" : k.spi >= 0.9 ? "مطابق برنامه" : "عقب‌تر از برنامه"}
+            hint={k.spi >= 1 ? "جلوتر از برنامه" : k.spi >= 0.9 ? "مطابق برنامه" : "عقب‌تر از برنامه"}
           />
         </div>
       )}

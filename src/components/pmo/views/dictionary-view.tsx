@@ -36,7 +36,7 @@ const ALIAS_TYPE_COLOR: Record<string, string> = {
   LEGACY: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
   ALTERNATIVE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
   TYPO: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-  IMPORTED: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+  IMPORTED: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
 };
 
 export function DictionaryView() {

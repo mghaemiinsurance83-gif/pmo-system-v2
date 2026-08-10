@@ -765,7 +765,7 @@ function StepCard({ step, ownerName }: { step: Step; ownerName?: string }) {
         {/* stacked bar */}
         <div className="flex h-5 w-full overflow-hidden rounded-md border">
           {step.executors.map((e, i) => {
-            const colors = ["bg-amber-500", "bg-teal-500", "bg-violet-500", "bg-emerald-500", "bg-rose-500", "bg-sky-500", "bg-orange-500"];
+            const colors = ["bg-amber-500", "bg-teal-500", "bg-violet-500", "bg-emerald-500", "bg-rose-500", "bg-fuchsia-500", "bg-orange-500"];
             const color = e.isPrimary ? "bg-amber-500" : colors[(i + 1) % colors.length];
             return (
               <div
@@ -782,7 +782,7 @@ function StepCard({ step, ownerName }: { step: Step; ownerName?: string }) {
         {/* legend chips */}
         <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
           {step.executors.map((e, i) => {
-            const colors = ["bg-amber-500", "bg-teal-500", "bg-violet-500", "bg-emerald-500", "bg-rose-500", "bg-sky-500", "bg-orange-500"];
+            const colors = ["bg-amber-500", "bg-teal-500", "bg-violet-500", "bg-emerald-500", "bg-rose-500", "bg-fuchsia-500", "bg-orange-500"];
             const color = e.isPrimary ? "bg-amber-500" : colors[(i + 1) % colors.length];
             const isOwner = e.name === ownerName;
             return (

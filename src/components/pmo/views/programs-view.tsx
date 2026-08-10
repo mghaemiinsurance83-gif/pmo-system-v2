@@ -510,7 +510,7 @@ function ProgramDetailDialog({ project, onClose }: { project: ProjectListItem | 
               {/* tasks */}
               <div>
                 <p className="text-xs font-semibold mb-2 text-foreground">فعالیت‌ها ({toFa(detail.tasks.length)})</p>
-                <div className="space-y-1.5 max-h-80 overflow-y-auto custom-scroll pl-1">
+                <div className="space-y-1.5">
                   {detail.tasks.map((t) => (
                     <div key={t.id} className="rounded-lg border bg-card p-2.5">
                       <div className="flex items-start justify-between gap-2 mb-1.5">

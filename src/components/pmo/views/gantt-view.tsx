@@ -47,11 +47,16 @@ export function GanttView() {
   const [filter, setFilter] = useState<string>("all");
   const [zoom, setZoom] = useState(60);
   const [showTasks, setShowTasks] = useState<Record<string, boolean>>({});
+  const [refMonth, setRefMonth] = useState<number | null>(null);
 
   useEffect(() => {
     apiFetch<GanttData>("/api/gantt")
       .then(setData)
       .catch((e) => setError(e.message));
+    // Fetch the reference month ("today") so we can draw a marker on the gantt.
+    apiFetch<{ jm: number }>("/api/system/settings")
+      .then((s) => { if (s.jm) setRefMonth(s.jm); })
+      .catch(() => {});
   }, []);
 
   // owners list for filter
@@ -115,18 +120,22 @@ export function GanttView() {
                 برنامه / فعالیت
               </div>
               <div className="flex">
-                {data.months.map((m, i) => (
-                  <div
-                    key={m}
-                    className={cn(
-                      "border-l px-1 py-2 text-center text-[11px] font-medium tabular-nums",
-                      (i + 1) % 3 === 0 ? "bg-muted/40" : "bg-card"
-                    )}
-                    style={{ width: colWidth }}
-                  >
-                    {m}
-                  </div>
-                ))}
+                {data.months.map((m, i) => {
+                  const isRef = refMonth === i + 1;
+                  return (
+                    <div
+                      key={m}
+                      className={cn(
+                        "border-l px-1 py-2 text-center text-[11px] font-medium tabular-nums relative",
+                        isRef ? "bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300" : (i + 1) % 3 === 0 ? "bg-muted/40" : "bg-card"
+                      )}
+                      style={{ width: colWidth }}
+                    >
+                      {m}
+                      {isRef && <span className="absolute -top-0.5 right-0.5 text-[8px] font-bold text-indigo-600 dark:text-indigo-400">امروز</span>}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -160,6 +169,12 @@ export function GanttView() {
                             <div key={i} className={cn("border-l", (i + 1) % 3 === 0 ? "bg-muted/20" : "")} style={{ width: colWidth }} />
                           ))}
                         </div>
+                        {/* reference (today) vertical line */}
+                        {refMonth && (
+                          <div className="pointer-events-none absolute inset-y-0 z-10" style={{ right: (refMonth - 1) * colWidth, width: colWidth }} title="ماه مرجع (امروز)">
+                            <div className="h-full border-r-2 border-dashed border-indigo-400/70 dark:border-indigo-500/60" />
+                          </div>
+                        )}
                         {/* project bar */}
                         <GanttBar
                           startMonth={p.startMonth}
@@ -191,6 +206,12 @@ export function GanttView() {
                               <div key={i} className={cn("border-l", (i + 1) % 3 === 0 ? "bg-muted/10" : "")} style={{ width: colWidth }} />
                             ))}
                           </div>
+                          {/* reference (today) vertical line */}
+                          {refMonth && (
+                            <div className="pointer-events-none absolute inset-y-0 z-10" style={{ right: (refMonth - 1) * colWidth, width: colWidth }}>
+                              <div className="h-full border-r-2 border-dashed border-indigo-400/70 dark:border-indigo-500/60" />
+                            </div>
+                          )}
                           <GanttBar
                             startMonth={t.startMonth}
                             endMonth={t.endMonth}
@@ -228,6 +249,11 @@ export function GanttView() {
         <div className="flex items-center gap-1.5">
           <span className="h-3 w-6 rounded bg-emerald-500/40 border-r-2 border-emerald-600" /> <span>پیشرفت واقعی</span>
         </div>
+        {refMonth && (
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 border-r-2 border-dashed border-indigo-400" /> <span>ماه مرجع (امروز)</span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -252,12 +278,13 @@ function GanttBar({
 }) {
   const s = Math.max(1, startMonth);
   const e = Math.min(12, endMonth);
-  const left = (s - 1) * colWidth;
+  // RTL: month 1 is on the RIGHT, so position bars from the right edge.
+  const right = (s - 1) * colWidth;
   const width = Math.max(colWidth * 0.6, (e - s + 1) * colWidth - 4);
 
   if (isMilestone) {
     return (
-      <div className="absolute inset-y-0 flex items-center" style={{ left: left + width / 2 - 6 }}>
+      <div className="absolute inset-y-0 flex items-center" style={{ right: right + width / 2 - 6 }}>
         <div className="h-3 w-3 rotate-45 bg-violet-500 shadow-sm ring-2 ring-violet-200 dark:ring-violet-900" />
       </div>
     );
@@ -268,7 +295,7 @@ function GanttBar({
   const progColor = color === "primary" ? "bg-primary" : "bg-teal-600";
 
   return (
-    <div className="absolute inset-y-1.5 flex items-center" style={{ left: left + 2, width: width - 4 }}>
+    <div className="absolute inset-y-1.5 flex items-center" style={{ right: right + 2, width: width - 4 }}>
       <div className={cn("relative h-5 w-full overflow-hidden rounded border", baseColor)}>
         {/* active months overlay */}
         {activeMonths && activeMonths.length > 0 && (
