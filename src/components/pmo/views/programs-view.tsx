@@ -45,6 +45,10 @@ interface Deputy {
   children: { id: string; name: string; code: string }[];
 }
 
+// Virtual id for the "independent managements" group (those MANAGEMENT nodes that
+// report directly to the company, not under any deputy).
+const INDEPENDENT_GROUP_ID = "__independents__";
+
 interface ProjectDetail {
   id: string;
   name: string;
@@ -108,6 +112,7 @@ const STATUS_OPTS = [
 
 export function ProgramsView() {
   const [deputies, setDeputies] = useState<Deputy[]>([]);
+  const [independents, setIndependents] = useState<{ id: string; name: string; code: string }[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -126,22 +131,43 @@ export function ProgramsView() {
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<{ items: OrgNode[] }>("/api/orgs/tree").then((t) => {
-      const deps = (t.items[0]?.children || []).map((d) => ({
-        id: d.id,
-        code: d.code,
-        name: d.name,
-        children: d.children.map((c) => ({ id: c.id, name: c.name, code: c.code })),
-      }));
+    // /api/orgs/tree returns a bare array (roots), NOT { items: [...] }.
+    apiFetch<OrgNode[]>("/api/orgs/tree").then((tree) => {
+      const root = tree[0];
+      if (!root) return;
+      // Deputies/Centers under the company
+      const deps: Deputy[] = root.children
+        .filter((c) => c.orgType === "DEPUTY" || c.orgType === "CENTER")
+        .map((d) => ({
+          id: d.id,
+          code: d.code,
+          name: d.name,
+          children: d.children
+            .filter((c) => c.orgType === "MANAGEMENT")
+            .map((c) => ({ id: c.id, name: c.name, code: c.code })),
+        }));
+      // Independent managements (MANAGEMENT nodes directly under the company)
+      const indeps = root.children
+        .filter((c) => c.orgType === "MANAGEMENT")
+        .map((c) => ({ id: c.id, name: c.name, code: c.code }));
       setDeputies(deps);
+      setIndependents(indeps);
     });
   }, []);
 
   // Available managements depend on the selected deputy.
+  //  - "all"                  → every management (deputies' children + independents)
+  //  - INDEPENDENT_GROUP_ID   → only the 8 independent managements
+  //  - a specific deputy id   → only that deputy's child managements
   const availableManagements =
     deputyFilter === "all"
-      ? deputies.flatMap((d) => d.children.map((m) => ({ ...m, deputyName: d.name })))
-      : deputies.find((d) => d.id === deputyFilter)?.children || [];
+      ? [
+          ...deputies.flatMap((d) => d.children.map((m) => ({ ...m, deputyName: d.name }))),
+          ...independents.map((m) => ({ ...m, deputyName: "مستقل" })),
+        ]
+      : deputyFilter === INDEPENDENT_GROUP_ID
+        ? independents.map((m) => ({ ...m, deputyName: "مستقل" }))
+        : deputies.find((d) => d.id === deputyFilter)?.children || [];
 
   // Reset management filter when the deputy changes (derived-key pattern —
   // setState during render is allowed and avoids the set-state-in-effect rule).
@@ -166,7 +192,13 @@ export function ProgramsView() {
     let cancelled = false;
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), summary: "1" });
     if (search) params.set("search", search);
-    if (deputyFilter !== "all") params.set("deputyId", deputyFilter);
+    // INDEPENDENT_GROUP_ID is a virtual selector — pass it as independent=1 so
+    // the API knows to filter to MANAGEMENT nodes directly under the company.
+    if (deputyFilter !== "all" && deputyFilter !== INDEPENDENT_GROUP_ID) {
+      params.set("deputyId", deputyFilter);
+    } else if (deputyFilter === INDEPENDENT_GROUP_ID) {
+      params.set("independent", "1");
+    }
     if (managementFilter !== "all") params.set("managementId", managementFilter);
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (fromMonth !== "all") params.set("fromMonth", fromMonth);
@@ -242,6 +274,7 @@ export function ProgramsView() {
               <SelectContent>
                 <SelectItem value="all">همه معاونت‌ها</SelectItem>
                 {deputies.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                <SelectItem value={INDEPENDENT_GROUP_ID}>مدیریت‌های مستقل</SelectItem>
               </SelectContent>
             </Select>
             <Select value={managementFilter} onValueChange={setManagementFilter}>
@@ -520,4 +553,4 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-interface OrgNode { id: string; code: string; name: string; children: OrgNode[] }
+interface OrgNode { id: string; code: string; name: string; orgType: string; children: OrgNode[] }

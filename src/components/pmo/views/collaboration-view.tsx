@@ -87,10 +87,12 @@ interface CollabProgram {
   steps: CollabStep[];
   myWeightShare: number;
   myProgressContribution: number;
-  mySharePercent: number;
+  mySharePercent: number;           // % of full-program weight in the time window
+  inRangeSharePercent: number;      // % of in-range weight (for reference)
   inRangeStepCount: number;
   totalStepCount: number;
   programTotalWeightInRange: number;
+  programTotalWeightAllYear: number;
 }
 
 interface CollabResponse {
@@ -104,6 +106,8 @@ interface CollabResponse {
     totalSteps: number;
     totalWeightShare: number;
     totalProgressContribution: number;
+    avgSharePercent: number;
+    overallSharePercent: number;
   };
   programs: CollabProgram[];
 }
@@ -330,18 +334,18 @@ export function CollaborationView() {
             accent="violet"
           />
           <KpiCard
-            label="مجموع سهم وزنی"
-            value={toFa(current.summary.totalWeightShare)}
+            label="میانگین سهم مشارکت"
+            value={faPercent(current.summary.avgSharePercent)}
             icon={<Scale className="h-5 w-5" />}
             accent="amber"
-            hint="Σ وزن سهم در گام‌ها"
+            hint={`میانگین سهم در ${toFa(current.summary.collaboratingPrograms)} برنامه`}
           />
           <KpiCard
-            label="مشارکت در پیشرفت"
-            value={toFa(current.summary.totalProgressContribution)}
+            label="سهم کل در بازه"
+            value={faPercent(current.summary.overallSharePercent)}
             icon={<TrendingUp className="h-5 w-5" />}
             accent="emerald"
-            hint="Σ (سهم × پیشرفت)"
+            hint="سهم این واحد از کل وزن برنامه‌ها در بازه"
           />
           <KpiCard
             label="واحد انتخاب‌شده"
@@ -480,12 +484,15 @@ function ProgramRow({
       {/* share bar (always visible) */}
       <div className="mt-2 mr-7">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground shrink-0">سهم وزنی:</span>
+          <span className="text-[11px] text-muted-foreground shrink-0">سهم در بازه:</span>
           <ProgressBar value={program.mySharePercent} size="sm" className="flex-1 max-w-xs" />
           <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
-            {toFa(program.myWeightShare)} / {toFa(program.programTotalWeightInRange)} وزن
+            {faPercent(program.mySharePercent)} از کل برنامه
           </span>
         </div>
+        <p className="mt-0.5 mr-20 text-[10px] text-muted-foreground">
+          وزن سهم: {toFa(program.myWeightShare)} از {toFa(program.programTotalWeightAllYear)} وزن کل برنامه · {toFa(program.inRangeStepCount)} از {toFa(program.totalStepCount)} گام در بازه
+        </p>
       </div>
 
       {/* expanded: steps */}

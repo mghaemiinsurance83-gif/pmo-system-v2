@@ -140,11 +140,12 @@ export async function GET(req: NextRequest) {
     owner: { id: string; name: string; code: string } | null;
     steps: StepAgg[];
     // aggregates over in-range steps
-    myWeightShare: number;
-    myProgressContribution: number;
+    myWeightShare: number;          // this unit's weight in the selected time window
+    myProgressContribution: number; // (weight/N) * progress / 100, in-range steps only
     inRangeStepCount: number;
     totalStepCount: number;
-    programTotalWeightInRange: number; // Σ weight of all in-range steps (all executors)
+    programTotalWeightInRange: number;   // Σ weight of all in-range steps (all executors)
+    programTotalWeightAllYear: number;   // Σ weight of ALL steps (all executors, all year)
   }
 
   const byProject = new Map<string, ProgramAgg>();
@@ -182,6 +183,7 @@ export async function GET(req: NextRequest) {
         inRangeStepCount: 0,
         totalStepCount: 0,
         programTotalWeightInRange: 0,
+        programTotalWeightAllYear: 0,
       };
       byProject.set(p.id, pa);
     }
@@ -241,6 +243,9 @@ export async function GET(req: NextRequest) {
     };
     pa.steps.push(step);
     pa.totalStepCount += 1;
+    // The "all year" total always accumulates (regardless of time window) so the
+    // share % is a fraction of the FULL program weight.
+    pa.programTotalWeightAllYear = Math.round((pa.programTotalWeightAllYear + w) * 100) / 100;
     if (ranged) {
       pa.inRangeStepCount += 1;
       pa.myWeightShare = Math.round((pa.myWeightShare + myWeightShare) * 100) / 100;
@@ -250,24 +255,47 @@ export async function GET(req: NextRequest) {
   }
 
   // Build the program list + overall summary.
+  // mySharePercent = this unit's weight in the time window / FULL program weight (all year).
+  // This makes the % directly sensitive to the selected time range: a narrower
+  // window → less of the program's annual weight falls in it → smaller %.
+  // Interpretation: "what fraction of the entire program does this unit carry out
+  // during this specific time window."
   const programs = [...byProject.values()]
     .map((pa) => ({
       ...pa,
-      // this unit's share % of the program (within the time range)
       mySharePercent:
+        pa.programTotalWeightAllYear > 0
+          ? Math.round((pa.myWeightShare / pa.programTotalWeightAllYear) * 1000) / 10
+          : 0,
+      // also expose the in-range-only share for reference
+      inRangeSharePercent:
         pa.programTotalWeightInRange > 0
           ? Math.round((pa.myWeightShare / pa.programTotalWeightInRange) * 1000) / 10
           : 0,
     }))
     .sort((a, b) => b.myWeightShare - a.myWeightShare);
 
+  // Summary KPIs. Replace raw "total weight share" (hard to interpret) with the
+  // AVERAGE share % across all collaborating programs, plus the time-window
+  // coverage ratio (how much of the year's weight falls in this window).
+  const avgSharePercent = programs.length > 0
+    ? Math.round((programs.reduce((s, p) => s + p.mySharePercent, 0) / programs.length) * 10) / 10
+    : 0;
+  const totalMyWeightInRange = Math.round(programs.reduce((s, p) => s + p.myWeightShare, 0) * 100) / 100;
+  const totalProgramWeightAllYear = Math.round(programs.reduce((s, p) => s + p.programTotalWeightAllYear, 0) * 100) / 100;
+  const overallSharePercent = totalProgramWeightAllYear > 0
+    ? Math.round((totalMyWeightInRange / totalProgramWeightAllYear) * 1000) / 10
+    : 0;
+
   const summary = {
     collaboratingPrograms: programs.length,
     collaboratingSteps: programs.reduce((s, p) => s + p.inRangeStepCount, 0),
     totalSteps: programs.reduce((s, p) => s + p.totalStepCount, 0),
-    totalWeightShare: Math.round(programs.reduce((s, p) => s + p.myWeightShare, 0) * 100) / 100,
+    totalWeightShare: totalMyWeightInRange,   // kept for backward compat
     totalProgressContribution:
       Math.round(programs.reduce((s, p) => s + p.myProgressContribution, 0) * 100) / 100,
+    avgSharePercent,        // NEW: average of per-program share %
+    overallSharePercent,    // NEW: this unit's overall share across all programs
   };
 
   return NextResponse.json({

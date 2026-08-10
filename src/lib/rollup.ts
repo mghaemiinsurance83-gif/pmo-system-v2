@@ -154,8 +154,14 @@ export function flattenTree(roots: OrgNode[], expanded: Set<string> | null = nul
 /**
  * Monthly progress trend (planned vs actual) rolled up across a set of projects.
  * Returns 12 data points for the Jalali year.
+ *
+ * IMPORTANT: for months AFTER the reference month, the "actual" is carry-forward
+ * (the last known actual value repeats) rather than 0, so the S-Curve doesn't
+ * visually "regress". The raw `actualRaw` field is also returned for consumers
+ * that need to distinguish "no data yet" from a real drop. Planned always
+ * continues to 100%.
  */
-export async function progressTrend(projectIds: string[], year = 1405) {
+export async function progressTrend(projectIds: string[], year = 1405, refMonth?: number) {
   if (projectIds.length === 0) return [];
   const PERSIAN_MONTHS = ["فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور","مهر","آبان","آذر","دی","بهمن","اسفند"];
   const hist = await db.projectProgressHistory.findMany({
@@ -176,14 +182,49 @@ export async function progressTrend(projectIds: string[], year = 1405) {
     byMonth[m].actual += h.progressPercent * w;
     byMonth[m].count += w;
   }
-  return PERSIAN_MONTHS.map((name, i) => {
+
+  // Compute raw monthly values first.
+  const raw = PERSIAN_MONTHS.map((name, i) => {
     const m = i + 1;
     const b = byMonth[m];
     return {
       month: name,
       monthIdx: m,
       planned: b.count > 0 ? Math.round((b.planned / b.count) * 10) / 10 : 0,
-      actual: b.count > 0 ? Math.round((b.actual / b.count) * 10) / 10 : 0,
+      actualRaw: b.count > 0 ? Math.round((b.actual / b.count) * 10) / 10 : 0,
+      hasActual: b.count > 0,
+    };
+  });
+
+  // Carry-forward actual: for months AFTER the reference month, repeat the last
+  // known actual value (from the reference month) so the S-Curve stays flat
+  // instead of dropping to 0. For months up to and including the reference
+  // month, use the raw actual value (even if 0 — that's a real report).
+  const refM = refMonth ?? 12;
+  // Find the last non-zero actual up to and including the reference month.
+  let lastActual = 0;
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i].monthIdx <= refM && raw[i].actualRaw > 0) {
+      lastActual = raw[i].actualRaw;
+    }
+  }
+  return raw.map((r) => {
+    let actual: number;
+    if (r.monthIdx <= refM) {
+      // Real reported value (may be 0 if genuinely no progress yet)
+      actual = r.actualRaw;
+    } else {
+      // Future month — carry forward the last known actual
+      actual = lastActual;
+    }
+    return {
+      month: r.month,
+      monthIdx: r.monthIdx,
+      planned: r.planned,
+      actual,
+      actualRaw: r.actualRaw,
+      hasActual: r.actualRaw > 0,
+      isFuture: r.monthIdx > refM,
     };
   });
 }

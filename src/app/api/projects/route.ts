@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   const ownerOrgId = searchParams.get("ownerOrgId");
   const deputyId = searchParams.get("deputyId");
   const managementId = searchParams.get("managementId");
+  const independent = searchParams.get("independent") === "1"; // filter to independent managements
   const statusFilter = searchParams.get("status"); // dynamic status
   const search = searchParams.get("search");
   const fromMonth = searchParams.get("fromMonth");
@@ -27,10 +28,20 @@ export async function GET(req: NextRequest) {
 
   const ref = await getReferenceDate();
 
-  // Build org-id filter set from deputy / management selection.
+  // Build org-id filter set from deputy / management / independent selection.
   let orgIdFilter: string[] | undefined;
   if (managementId) {
     orgIdFilter = [managementId];
+  } else if (independent) {
+    // Independent managements = MANAGEMENT nodes whose parent is the company.
+    const company = await db.organization.findFirst({ where: { orgType: "COMPANY" } });
+    if (company) {
+      const indeps = await db.organization.findMany({
+        where: { parentOrgId: company.id, orgType: "MANAGEMENT" },
+        select: { id: true },
+      });
+      orgIdFilter = indeps.map((m) => m.id);
+    }
   } else if (deputyId) {
     const deputy = await db.organization.findUnique({ where: { id: deputyId }, include: { children: true } });
     if (deputy) orgIdFilter = [deputy.id, ...deputy.children.map((c) => c.id)];
