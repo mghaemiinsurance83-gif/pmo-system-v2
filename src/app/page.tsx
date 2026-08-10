@@ -11,6 +11,7 @@ import {
   Database,
   FileSpreadsheet,
   Handshake,
+  UsersRound,
   Moon,
   Sun,
   Menu,
@@ -28,6 +29,7 @@ import { ReportsView } from "@/components/pmo/views/reports-view";
 import { DataModelView } from "@/components/pmo/views/data-model-view";
 import { RawDataView } from "@/components/pmo/views/raw-data-view";
 import { ParticipationView } from "@/components/pmo/views/participation-view";
+import { CollaborationView } from "@/components/pmo/views/collaboration-view";
 import { apiFetch } from "@/lib/api";
 
 type ViewId =
@@ -36,6 +38,7 @@ type ViewId =
   | "gantt"
   | "programs"
   | "participation"
+  | "collaboration"
   | "dictionary"
   | "reports"
   | "datamodel"
@@ -47,6 +50,7 @@ const NAV: { id: ViewId; label: string; icon: React.ElementType; desc: string }[
   { id: "gantt", label: "گانت چارت", icon: GanttChartSquare, desc: "تایم‌لاین ماهانه شمسی" },
   { id: "programs", label: "برنامه‌ها", icon: FolderKanban, desc: "فهرست برنامه‌های عملیاتی" },
   { id: "participation", label: "سهم مشارکت مدیریت‌ها", icon: Handshake, desc: "سهم هر مدیریت در برنامه‌ها و گام‌ها" },
+  { id: "collaboration", label: "مشارکت مدیریت در برنامه‌ها", icon: UsersRound, desc: "برنامه‌های همکاری هر معاونت/مدیریت و سهم آن‌ها" },
   { id: "dictionary", label: "فرهنگ‌نامه واحدها", icon: BookMarked, desc: "نگاشت نام‌ها و مترادف‌ها" },
   { id: "reports", label: "گزارش‌ها", icon: BarChart3, desc: "S-Curve و عملکرد مدیریت‌ها" },
   { id: "datamodel", label: "مدل داده", icon: Database, desc: "ERD و Data Dictionary" },
@@ -76,8 +80,8 @@ export default function Home() {
   const [refLabel, setRefLabel] = useState<string>("");
 
   useEffect(() => {
-    apiFetch<{ monthLabel: string }>("/api/system/settings")
-      .then((s) => setRefLabel(s.monthLabel))
+    apiFetch<{ dayLabel: string; monthLabel: string }>("/api/system/settings")
+      .then((s) => setRefLabel(s.dayLabel || s.monthLabel))
       .catch(() => {});
   }, []);
 
@@ -111,9 +115,9 @@ export default function Home() {
           </div>
           <div className="mr-auto flex items-center gap-1.5">
             {refLabel && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-teal-200/60 bg-teal-50 dark:border-teal-900/40 dark:bg-teal-950/30 px-2.5 py-1 text-[11px] font-medium text-teal-700 dark:text-teal-300" title="تاریخ مرجع گزارش‌ها — همه گزارش‌ها بر اساس این تاریخ به‌روز می‌شوند">
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-teal-200/60 bg-teal-50 dark:border-teal-900/40 dark:bg-teal-950/30 px-2.5 py-1 text-[11px] font-medium text-teal-700 dark:text-teal-300" title="تاریخ امروز سیستم — همه گزارش‌ها بر اساس این تاریخ به‌روز می‌شوند">
                 <CalendarClock className="h-3.5 w-3.5" />
-                تاریخ مرجع: {refLabel}
+                امروز: {refLabel}
               </span>
             )}
             <ThemeToggle />
@@ -185,6 +189,7 @@ export default function Home() {
             {view === "gantt" && <GanttView />}
             {view === "programs" && <ProgramsView />}
             {view === "participation" && <ParticipationView />}
+            {view === "collaboration" && <CollaborationView />}
             {view === "dictionary" && <DictionaryView />}
             {view === "reports" && <ReportsView />}
             {view === "datamodel" && <DataModelView />}

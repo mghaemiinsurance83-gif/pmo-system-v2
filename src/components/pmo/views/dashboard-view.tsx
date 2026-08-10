@@ -75,9 +75,10 @@ export function DashboardView() {
 
   const { kpis } = data;
 
-  // status pie data
-  const statusData = Object.entries(data.taskStatusDist).map(([k, v]) => ({ name: STATUS_FA[k] || k, value: v, color: STATUS_COLORS[k] || "#94a3b8" }));
-  const totalTasks = statusData.reduce((s, d) => s + d.value, 0);
+  // status pie data — uses DYNAMIC project status (computed from reference date)
+  // so the delayed / not-started categories reflect "today".
+  const statusData = Object.entries(data.projectStatusDist).map(([k, v]) => ({ name: STATUS_FA[k] || k, value: v, color: STATUS_COLORS[k] || "#94a3b8" }));
+  const totalStatusItems = statusData.reduce((s, d) => s + d.value, 0);
 
   // deputy bar (top 8) — truncate long names for the Y-axis
   const deputyBars = data.deputyRollup.slice(0, 8).map((d) => {
@@ -138,10 +139,10 @@ export function DashboardView() {
           </div>
         </SectionCard>
 
-        <SectionCard title="توزیع وضعیت فعالیت‌ها" description={`${toFa(totalTasks)} فعالیت در کل سامانه`}>
+        <SectionCard title="توزیع وضعیت برنامه‌ها" description={`${toFa(totalStatusItems)} برنامه — بر اساس تاریخ مرجع ${data.referenceLabel || ""}`}>
           <div className="space-y-3">
             {statusData.map((s) => {
-              const pct = totalTasks > 0 ? (s.value / totalTasks) * 100 : 0;
+              const pct = totalStatusItems > 0 ? (s.value / totalStatusItems) * 100 : 0;
               return (
                 <div key={s.name}>
                   <div className="flex items-center justify-between mb-1">

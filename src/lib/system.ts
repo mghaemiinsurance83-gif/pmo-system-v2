@@ -3,22 +3,27 @@ import { toJalaali } from "jalaali-js";
 import { parseJalaliString, type JalaliDate } from "@/lib/jalali";
 
 // =============================================================================
-// SYSTEM REFERENCE DATE (تاریخ مرجع)
-// Single source of truth for "today" as the system sees it. All status / delay /
-// as-of-progress computations read this. Seeded to مهر ۱۴۰۵ (the reporting as-of
-// month the simulated progress data caps at). Editable via /api/system/settings.
+// SYSTEM REFERENCE DATE (تاریخ مرجع = "امروز سیستم")
+// Single source of truth for "today" as the system sees it. By default this is
+// the REAL current date in Asia/Tehran — it auto-updates every day (19 مرداد
+// today, 20 مرداد tomorrow, …). An admin MAY override it via /api/system/settings
+// to lock a specific reporting date; otherwise the live date is used. All status
+// / delay / as-of-progress computations read this.
 // =============================================================================
 
 let _cache: { ref: ReferenceDate; ts: number } | null = null;
 const CACHE_TTL = 30_000; // 30s in-process cache
 
 export interface ReferenceDate {
-  jalali: string; // "1405/07/15"
+  jalali: string; // "1405/05/19"
   jy: number;
   jm: number; // 1..12
-  jd: number;
-  monthLabel: string; // "مهر ۱۴۰۵"
+  jd: number; // 1..31
+  monthLabel: string; // "مرداد ۱۴۰۵"
+  dayLabel: string; // "۱۹ مرداد ۱۴۰۵" — full date with day
+  longLabel: string; // "۱۹ مرداد ۱۴۰۵" (alias for clarity)
   operationalYear: number; // 1405
+  isOverridden: boolean; // true when an admin has locked a specific date
 }
 
 const PERSIAN_MONTHS = [
@@ -30,26 +35,52 @@ function toFaDigits(input: number | string): string {
   return String(input).replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
 }
 
-/** Build a ReferenceDate object from a Jalali "1405/07/15" string + operational year. */
-function buildRef(jalaliStr: string, operationalYear: number): ReferenceDate {
-  const j = parseJalaliString(jalaliStr);
-  const jy = j?.jy ?? operationalYear;
-  const jm = j?.jm ?? 7;
-  const jd = j?.jd ?? 15;
+/** Build a ReferenceDate object from a Jalali {jy,jm,jd} + operational year. */
+function buildRefFromJ(jy: number, jm: number, jd: number, operationalYear: number, isOverridden: boolean): ReferenceDate {
+  const monthLabel = `${PERSIAN_MONTHS[jm - 1]} ${toFaDigits(jy)}`;
   return {
     jalali: `${jy}/${String(jm).padStart(2, "0")}/${String(jd).padStart(2, "0")}`,
     jy,
     jm,
     jd,
-    monthLabel: `${PERSIAN_MONTHS[jm - 1]} ${toFaDigits(jy)}`,
+    monthLabel,
+    dayLabel: `${toFaDigits(jd)} ${PERSIAN_MONTHS[jm - 1]} ${toFaDigits(jy)}`,
+    longLabel: `${toFaDigits(jd)} ${PERSIAN_MONTHS[jm - 1]} ${toFaDigits(jy)}`,
     operationalYear,
+    isOverridden,
   };
 }
 
+/** Build a ReferenceDate from a Jalali "1405/05/19" string + operational year. */
+function buildRef(jalaliStr: string, operationalYear: number, isOverridden: boolean): ReferenceDate {
+  const j = parseJalaliString(jalaliStr);
+  const jy = j?.jy ?? operationalYear;
+  const jm = j?.jm ?? 1;
+  const jd = j?.jd ?? 1;
+  return buildRefFromJ(jy, jm, jd, operationalYear, isOverridden);
+}
+
 /**
- * Get the system reference date (cached briefly). Falls back to the real current
- * Jalali date if no setting is present, clamped into the operational year so the
- * 1405 demo always shows meaningful in-progress / delayed states.
+ * Get the current Gregorian date parts in Asia/Tehran timezone (not UTC).
+ * Uses Intl.DateTimeFormat so it respects DST and the exact wall-clock date the
+ * user sees on their machine in ایران.
+ */
+function getTehranNowGregorian(): { gy: number; gm: number; gd: number } {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tehran",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = fmt.formatToParts(new Date());
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value || 0);
+  return { gy: get("year"), gm: get("month"), gd: get("day") };
+}
+
+/**
+ * Get the system reference date (cached briefly). Defaults to the REAL current
+ * Jalali date in Asia/Tehran — auto-updates every day. Falls back to an admin
+ * override stored in SystemSetting if one is present.
  */
 export async function getReferenceDate(): Promise<ReferenceDate> {
   if (_cache && Date.now() - _cache.ts < CACHE_TTL) return _cache.ref;
@@ -60,22 +91,19 @@ export async function getReferenceDate(): Promise<ReferenceDate> {
   const map = new Map(rows.map((r) => [r.key, r.value]));
 
   const operationalYear = map.get("operationalYear") ? Number(map.get("operationalYear")) : 1405;
-  let jalaliStr = map.get("referenceDate");
+  const override = map.get("referenceDate");
 
-  if (!jalaliStr) {
-    // Default: real today in Jalali, clamped to the operational year window.
-    const now = new Date();
-    const j = toJalaali(now.getUTCFullYear(), now.getUTCMonth() + 1, now.getUTCDate());
-    // If real-today is outside the operational year, use mid-year (مهر) as the
-    // reporting as-of date so the 1405 plan shows a realistic mix of states.
-    if (j.jy !== operationalYear) {
-      jalaliStr = `${operationalYear}/07/15`;
-    } else {
-      jalaliStr = `${j.jy}/${String(j.jm).padStart(2, "0")}/${String(j.jd).padStart(2, "0")}`;
-    }
+  let ref: ReferenceDate;
+  if (override) {
+    // Admin has locked a specific reporting date.
+    ref = buildRef(override, operationalYear, true);
+  } else {
+    // Default: REAL today in Asia/Tehran (auto-updates each day).
+    const g = getTehranNowGregorian();
+    const j = toJalaali(g.gy, g.gm, g.gd);
+    ref = buildRefFromJ(j.jy, j.jm, j.jd, operationalYear, false);
   }
 
-  const ref = buildRef(jalaliStr, operationalYear);
   _cache = { ref, ts: Date.now() };
   return ref;
 }
@@ -89,21 +117,19 @@ export function invalidateReferenceDateCache() {
 // DYNAMIC STATUS COMPUTATION
 // Derives the effective status of a project/task from the reference date and its
 // schedule, rather than relying on the stale stored status. This is what makes
-// "changing the reference date updates all reports" actually work.
+// "the reference date updating updates all reports" actually work.
 // =============================================================================
 
 export type DynamicStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "DELAYED";
 
 /**
  * Compute the effective status given the reference month and the entity's schedule.
- *  - startMonth > refMonth  → NOT_STARTED (planned but not begun)
  *  - progress >= 100         → COMPLETED
+ *  - startMonth > refMonth   → NOT_STARTED (planned but not begun)
  *  - endMonth < refMonth AND progress < 100 → DELAYED (should be done, isn't)
  *  - otherwise               → IN_PROGRESS
  *
  * `refMonth` is the reference month index (1..12) within the operational year.
- * Pass 0 (before year) → everything NOT_STARTED; pass 13 (after year) → DELAYED
- * for any incomplete item.
  */
 export function computeDynamicStatus(
   progress: number,
@@ -112,10 +138,8 @@ export function computeDynamicStatus(
   refMonth: number,
 ): DynamicStatus {
   if (progress >= 100) return "COMPLETED";
-  if (refMonth <= 0) return "NOT_STARTED"; // before the operational year
   if (startMonth != null && startMonth > refMonth) return "NOT_STARTED";
   if (endMonth != null && endMonth < refMonth && progress < 100) return "DELAYED";
-  if (refMonth >= 13 && progress < 100) return "DELAYED"; // year is over
   return "IN_PROGRESS";
 }
 

@@ -163,7 +163,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     },
     referenceDate: ref.jalali,
     referenceMonth: ref.jm,
-    referenceLabel: ref.monthLabel,
+    referenceLabel: ref.dayLabel,
     timeRange: { fromMonth: lo, toMonth: hi },
     totalSteps: tasks.length,
     inRangeSteps: inRangeStepCount,

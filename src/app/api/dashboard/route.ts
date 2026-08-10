@@ -113,7 +113,7 @@ export async function GET(_req: NextRequest) {
   return NextResponse.json({
     referenceDate: ref.jalali,
     referenceMonth: ref.jm,
-    referenceLabel: ref.monthLabel,
+    referenceLabel: ref.dayLabel,
     operationalYear: ref.operationalYear,
     kpis: {
       totalProjects,

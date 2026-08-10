@@ -55,5 +55,5 @@ export async function GET() {
 
   items.sort((a, b) => b.progress - a.progress);
 
-  return NextResponse.json({ items, referenceLabel: ref.monthLabel });
+  return NextResponse.json({ items, referenceLabel: ref.dayLabel });
 }

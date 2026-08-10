@@ -61,7 +61,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     totalWeight,
     referenceDate: ref.jalali,
     referenceMonth: ref.jm,
-    referenceLabel: ref.monthLabel,
+    referenceLabel: ref.dayLabel,
     unitLinks: project.unitLinks.map((ul) => ({
       id: ul.id,
       org: ul.org,

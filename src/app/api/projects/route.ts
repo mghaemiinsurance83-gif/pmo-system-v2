@@ -127,7 +127,7 @@ export async function GET(req: NextRequest) {
     summary,
     referenceDate: ref.jalali,
     referenceMonth: ref.jm,
-    referenceLabel: ref.monthLabel,
+    referenceLabel: ref.dayLabel,
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
   });
 }

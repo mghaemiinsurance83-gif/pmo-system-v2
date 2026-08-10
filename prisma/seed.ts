@@ -3,7 +3,7 @@
 // Run: bun run prisma/seed.ts
 import ExcelJS from "exceljs";
 import { PrismaClient } from "@prisma/client";
-import { toGregorian, isValidJalaaliDate, jalaaliMonthLength } from "jalaali-js";
+import { toGregorian, isValidJalaaliDate, jalaaliMonthLength, toJalaali } from "jalaali-js";
 
 const db = new PrismaClient();
 
@@ -395,8 +395,22 @@ async function main() {
     data: { fileName: "(v27-1) برنامه عملیاتی های 1405.xlsx", batchLabel: "برنامه‌های عملیاتی ۱۴۰۵", status: "RUNNING" },
   });
 
-  const AS_OF_MONTH = 7; // مهر 1405 = "today" for progress simulation
-  const AS_OF_JY = 1405;
+  // AS_OF_MONTH = the REAL current Jalali month in Asia/Tehran, so the simulated
+  // progress data agrees with the live reference date used by the app (which also
+  // defaults to real today). This makes the demo consistent: the progress shown
+  // reflects "as of today", and statuses derived from the reference date match.
+  const tehranNowGregorian = (() => {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Tehran", year: "numeric", month: "2-digit", day: "2-digit",
+    });
+    const parts = fmt.formatToParts(new Date());
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value || 0);
+    return { gy: get("year"), gm: get("month"), gd: get("day") };
+  })();
+  const _nowJ = toJalaali(tehranNowGregorian.gy, tehranNowGregorian.gm, tehranNowGregorian.gd);
+  const AS_OF_MONTH = _nowJ.jm; // real current month (1..12)
+  const AS_OF_JY = _nowJ.jy;
+  console.log(`   AS_OF_MONTH (real today) = ${AS_OF_MONTH} (${PERSIAN_MONTHS[AS_OF_MONTH - 1]} ${AS_OF_JY})`);
   let projectCount = 0;
   let taskCount = 0;
   let progressCount = 0;
@@ -773,21 +787,19 @@ async function main() {
 
   await db.importBatch.update({ where: { id: batch.id }, data: { finishedAt: new Date(), sheetsProcessed: projectCount, rowsProcessed: taskCount, status: "DONE" } });
 
-  // ── Seed system settings (single-source reference date) ─────────────────
-  // The reference date (تاریخ مرجع) = "today" for the system. Seeded to مهر ۱۴۰۵
-  // (AS_OF_MONTH=7) so the simulated progress data and the dynamic status
-  // computations agree. Editable later via /api/system/settings.
+  // ── Seed system settings ──────────────────────────────────────────────
+  // operationalYear is seeded. referenceDate is intentionally NOT seeded — the
+  // system defaults to the REAL current date in Asia/Tehran (auto-updates each
+  // day). An admin can still lock a specific date via /api/system/settings if a
+  // fixed reporting as-of date is ever needed.
   await db.systemSetting.upsert({
     where: { key: "operationalYear" },
     create: { key: "operationalYear", value: "1405", dataType: "number", description: "سال عملیاتی" },
     update: { value: "1405" },
   });
-  await db.systemSetting.upsert({
-    where: { key: "referenceDate" },
-    create: { key: "referenceDate", value: "1405/07/15", dataType: "string", description: "تاریخ مرجع گزارش (تاریخ امروز سیستم)" },
-    update: { value: "1405/07/15" },
-  });
-  console.log(`   System reference date: 1405/07/15 (مهر ۱۴۰۵)`);
+  // Clear any stale locked referenceDate from a previous seed so the live date is used.
+  await db.systemSetting.deleteMany({ where: { key: "referenceDate" } });
+  console.log(`   System reference date: live today (no override) — app reads Asia/Tehran now`);
 
   console.log("\n" + "=".repeat(70));
   console.log("✅ ETL COMPLETE");
