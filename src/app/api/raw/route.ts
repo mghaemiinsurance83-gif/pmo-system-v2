@@ -21,7 +21,6 @@ export async function GET(req: NextRequest) {
       where,
       include: {
         _count: { select: { rawRows: true } },
-        mappedProject: { select: { id: true, projectCode: true, projectName: true, ownerOrg: { select: { name: true } } } },
       },
       orderBy: { sheetName: "asc" },
       skip: (page - 1) * pageSize,
@@ -29,23 +28,39 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
+  // mappedProjectId is a plain string (not a relation), so resolve mapped projects
+  // in a second query when present.
+  const mappedIds = items
+    .map((s) => s.mappedProjectId)
+    .filter((id): id is string => !!id);
+  const mappedProjects = mappedIds.length
+    ? await db.project.findMany({
+        where: { id: { in: mappedIds } },
+        select: { id: true, projectCode: true, projectName: true, ownerOrg: { select: { name: true } } },
+      })
+    : [];
+  const projById = new Map(mappedProjects.map((p) => [p.id, p]));
+
   return NextResponse.json({
     total,
     page,
     pageSize,
-    items: items.map((s) => ({
-      id: s.id,
-      sheetName: s.sheetName,
-      projectTitle: s.projectTitle,
-      managerRaw: s.managerRaw,
-      programNum: s.programNum,
-      weight: s.weight,
-      rowCount: s.rowCount,
-      rawRowCount: s._count.rawRows,
-      status: s.status,
-      mappedProject: s.mappedProject
-        ? { id: s.mappedProject.id, code: s.mappedProject.projectCode, name: s.mappedProject.projectName, owner: s.mappedProject.ownerOrg?.name || "—" }
-        : null,
-    })),
+    items: items.map((s) => {
+      const p = s.mappedProjectId ? projById.get(s.mappedProjectId) : null;
+      return {
+        id: s.id,
+        sheetName: s.sheetName,
+        projectTitle: s.projectTitle,
+        managerRaw: s.managerRaw,
+        programNum: s.programNum,
+        weight: s.weight,
+        rowCount: s.rowCount,
+        rawRowCount: s._count.rawRows,
+        status: s.status,
+        mappedProject: p
+          ? { id: p.id, code: p.projectCode, name: p.projectName, owner: p.ownerOrg?.name || "—" }
+          : null,
+      };
+    }),
   });
 }

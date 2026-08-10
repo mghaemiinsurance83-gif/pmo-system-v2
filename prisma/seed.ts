@@ -407,13 +407,35 @@ async function main() {
     // Skip the summary/index sheets
     if (sheetName.includes("معاونت ها") || sheetName.includes("اکسل")) continue;
 
-    // Determine layout by scanning row 6
+    // ── Adaptive layout detection ──────────────────────────────────────────
+    // Two known layouts exist in the workbook:
+    //   Variant A/B (most sheets): header row=6, month row=7, tasks start row=8,
+    //     metadata in rows 3(title)/4(manager)/5(program).
+    //   Variant C ("کسب و کار" sheets): rows 2-3 are a merged banner; metadata in
+    //     rows 4(title)/5(manager)/6(program); header row=7, month row=8,
+    //     tasks start row=9.
+    // We detect the header row by scanning rows 4..9 for a row that contains both
+    // "ردیف"/"رديف" and ("شرح عملیات" or "اقدامات"). Month row and first task
+    // row follow from the detected header row.
+    let headerRow = 6;
+    for (let r = 4; r <= 9; r++) {
+      let hasRowNo = false, hasTaskDesc = false;
+      for (let c = 1; c <= Math.min(ws.columnCount, 30); c++) {
+        const v = cellText(ws.getCell(r, c).value).toString();
+        if (v.includes("رديف") || v.includes("ردیف")) hasRowNo = true;
+        if (v.includes("شرح عملیات") || v.includes("اقدامات")) hasTaskDesc = true;
+      }
+      if (hasRowNo && hasTaskDesc) { headerRow = r; break; }
+    }
+    const monthRow = headerRow + 1;
+    const firstTaskRow = headerRow + 2;
+
     const colMap: Record<string, number> = {};
     const monthCols: Record<string, number> = {};
     for (let c = 1; c <= ws.columnCount; c++) {
-      const v6 = cellText(ws.getCell(6, c).value);
-      if (v6) {
-        const s = v6.toString();
+      const vh = cellText(ws.getCell(headerRow, c).value);
+      if (vh) {
+        const s = vh.toString();
         if (s.includes("رديف") || s.includes("ردیف")) colMap.row_no = c;
         else if (s.includes("شرح عملیات") || s.includes("اقدامات")) colMap.task_desc = c;
         else if (s.includes("وزن هر عملیات")) colMap.weight = c;
@@ -423,18 +445,30 @@ async function main() {
         else if (s.includes("زمان اجراي") || s.includes("زمان اجرای")) colMap.time_block_start = c;
         else if (s.includes("ملاحظات")) colMap.notes = c;
       }
-      const v7 = cellText(ws.getCell(7, c).value);
-      if (v7) {
-        const s = v7.toString().trim();
+      const vm = cellText(ws.getCell(monthRow, c).value);
+      if (vm) {
+        const s = vm.toString().trim();
         if (PERSIAN_MONTHS.includes(s)) monthCols[s] = c;
       }
     }
     if (!colMap.task_desc) continue;
 
-    // Parse project metadata
-    const r3 = cellText(ws.getCell(3, 1).value);
-    const r4 = cellText(ws.getCell(4, 1).value);
-    const r5 = cellText(ws.getCell(5, 1).value);
+    // Detect metadata rows by keyword (scan col A of rows 2..7).
+    let titleRow = 0, managerRow = 0, programRow = 0;
+    for (let r = 2; r <= 7; r++) {
+      const v = cellText(ws.getCell(r, 1).value).toString();
+      if (/عنوان\s*پروژه/.test(v) && !titleRow) titleRow = r;
+      if (/مدیر\s*پروژه/.test(v) && !managerRow) managerRow = r;
+      if (/عنوان\s*برنامه/.test(v) && !programRow) programRow = r;
+    }
+    if (!titleRow) titleRow = 3;
+    if (!managerRow) managerRow = titleRow + 1;
+    if (!programRow) programRow = managerRow + 1;
+
+    // Parse project metadata from the detected rows
+    const rTitle = cellText(ws.getCell(titleRow, 1).value);
+    const rManager = cellText(ws.getCell(managerRow, 1).value);
+    const rProgram = cellText(ws.getCell(programRow, 1).value);
 
     // Strip any leading "N- عنوان پروژه/برنامه :" or "N- مدیر پروژه :" prefix.
     const stripPrefix = (s: string) =>
@@ -444,16 +478,16 @@ async function main() {
     const looksLikeManager = (s: string) =>
       /(مدیر\s*پروژه|واحد\s*مبارزه|مدیریت\s+\S)/.test(s);
 
-    let projectTitle = stripPrefix(r3);
-    let managerRaw = stripPrefix(r4);
-    let programTitle = stripPrefix(r5);
+    let projectTitle = stripPrefix(rTitle);
+    let managerRaw = stripPrefix(rManager);
+    let programTitle = stripPrefix(rProgram);
 
     // If programTitle looks like a manager line (row-shifted Variant B), drop it.
-    if (!programTitle || looksLikeManager(r5) || /^\s*\d+\s*[-–]\s*مدیر/.test(r5)) {
+    if (!programTitle || looksLikeManager(rProgram) || /^\s*\d+\s*[-–]\s*مدیر/.test(rProgram)) {
       programTitle = "";
     }
     // If projectTitle looks like a manager line, it's mis-extracted — clear it.
-    if (looksLikeManager(r3) || /^\s*\d+\s*[-–]\s*مدیر/.test(r3)) {
+    if (looksLikeManager(rTitle) || /^\s*\d+\s*[-–]\s*مدیر/.test(rTitle)) {
       projectTitle = "";
     }
     // Prefer programTitle for display when both exist and projectTitle is just the project (higher-level) name.
@@ -464,7 +498,7 @@ async function main() {
     let startRaw: string | null = null;
     let endRaw: string | null = null;
     let goal: string | null = null;
-    for (let r = 3; r <= 5; r++) {
+    for (let r = 2; r <= 7; r++) {
       for (let c = 1; c <= ws.columnCount; c++) {
         const v = cellText(ws.getCell(r, c).value);
         if (!v) continue;
@@ -569,7 +603,7 @@ async function main() {
     // Iterate task rows
     const tasks: { id: string; weight: number; activeMonths: number[]; startJm: number; endJm: number; actualByNow: number; delayFactor: number }[] = [];
     let rawRowCount = 0;
-    for (let r = 8; r <= ws.rowCount; r++) {
+    for (let r = firstTaskRow; r <= ws.rowCount; r++) {
       const rowNoVal = colMap.row_no ? cellText(ws.getCell(r, colMap.row_no).value) : null;
       const taskDesc = colMap.task_desc ? cellText(ws.getCell(r, colMap.task_desc).value) : null;
       if (!taskDesc && !rowNoVal) continue;

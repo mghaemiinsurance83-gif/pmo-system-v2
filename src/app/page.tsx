@@ -10,6 +10,7 @@ import {
   BarChart3,
   Database,
   FileSpreadsheet,
+  Handshake,
   Moon,
   Sun,
   Menu,
@@ -25,12 +26,14 @@ import { DictionaryView } from "@/components/pmo/views/dictionary-view";
 import { ReportsView } from "@/components/pmo/views/reports-view";
 import { DataModelView } from "@/components/pmo/views/data-model-view";
 import { RawDataView } from "@/components/pmo/views/raw-data-view";
+import { ParticipationView } from "@/components/pmo/views/participation-view";
 
 type ViewId =
   | "dashboard"
   | "tree"
   | "gantt"
   | "programs"
+  | "participation"
   | "dictionary"
   | "reports"
   | "datamodel"
@@ -41,6 +44,7 @@ const NAV: { id: ViewId; label: string; icon: React.ElementType; desc: string }[
   { id: "tree", label: "درخت سازمان و پروژه", icon: Network, desc: "ساختار سلسله‌مراتبی و Roll-up" },
   { id: "gantt", label: "گانت چارت", icon: GanttChartSquare, desc: "تایم‌لاین ماهانه شمسی" },
   { id: "programs", label: "برنامه‌ها", icon: FolderKanban, desc: "فهرست برنامه‌های عملیاتی" },
+  { id: "participation", label: "سهم مشارکت مدیریت‌ها", icon: Handshake, desc: "سهم هر مدیریت در برنامه‌ها و گام‌ها" },
   { id: "dictionary", label: "فرهنگ‌نامه واحدها", icon: BookMarked, desc: "نگاشت نام‌ها و مترادف‌ها" },
   { id: "reports", label: "گزارش‌ها", icon: BarChart3, desc: "S-Curve و عملکرد مدیریت‌ها" },
   { id: "datamodel", label: "مدل داده", icon: Database, desc: "ERD و Data Dictionary" },
@@ -169,6 +173,7 @@ export default function Home() {
             {view === "tree" && <ProjectTreeView />}
             {view === "gantt" && <GanttView />}
             {view === "programs" && <ProgramsView />}
+            {view === "participation" && <ParticipationView />}
             {view === "dictionary" && <DictionaryView />}
             {view === "reports" && <ReportsView />}
             {view === "datamodel" && <DataModelView />}
@@ -183,11 +188,11 @@ export default function Home() {
           <p className="flex items-center gap-1.5">
             <span className="font-semibold text-foreground">سامانه مدیریت برنامه‌های سازمانی</span>
             <span className="opacity-50">•</span>
-            <span>۱۶۰ برنامه</span>
+            <span>۱۶۳ برنامه</span>
             <span className="opacity-50">•</span>
-            <span>۱٬۰۴۶ فعالیت</span>
+            <span>۱٬۰۷۱ فعالیت</span>
             <span className="opacity-50">•</span>
-            <span>۳۶ واحد سازمانی</span>
+            <span>۳۷ واحد سازمانی</span>
           </p>
           <p className="flex items-center gap-1.5">
             <span>مدل دادهٔ نرمال‌شده ۳NF</span>

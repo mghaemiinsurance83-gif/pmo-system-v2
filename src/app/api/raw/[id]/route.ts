@@ -8,10 +8,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     include: {
       batch: true,
       rawRows: { orderBy: { rowNumber: "asc" } },
-      mappedProject: { select: { id: true, projectCode: true, projectName: true, ownerOrg: { select: { name: true } } } },
     },
   });
   if (!sheet) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // mappedProjectId is a plain string, not a relation — resolve separately.
+  let mappedProject: { id: string; code: string; name: string; owner: string } | null = null;
+  if (sheet.mappedProjectId) {
+    const p = await db.project.findUnique({
+      where: { id: sheet.mappedProjectId },
+      select: { id: true, projectCode: true, projectName: true, ownerOrg: { select: { name: true } } },
+    });
+    if (p) {
+      mappedProject = { id: p.id, code: p.projectCode, name: p.projectName, owner: p.ownerOrg?.name || "—" };
+    }
+  }
 
   return NextResponse.json({
     id: sheet.id,
@@ -28,14 +39,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     status: sheet.status,
     importedAt: sheet.importedAt,
     batch: { fileName: sheet.batch.fileName, label: sheet.batch.batchLabel },
-    mappedProject: sheet.mappedProject
-      ? {
-          id: sheet.mappedProject.id,
-          code: sheet.mappedProject.projectCode,
-          name: sheet.mappedProject.projectName,
-          owner: sheet.mappedProject.ownerOrg?.name || "—",
-        }
-      : null,
+    mappedProject,
     rows: sheet.rawRows.map((r) => ({
       id: r.id,
       rowNumber: r.rowNumber,
