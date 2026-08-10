@@ -1,0 +1,382 @@
+// Prisma schema — سامانه مدیریت برنامه‌های سازمانی
+// Normalized relational model (3NF) for organizational project/program management.
+// Layers: Master (Organization, Project, Task) + Dictionary (alias mapping) + Raw (Excel import) + Audit.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// 1. ORGANIZATION — hierarchical org structure (Company → Deputy → Management → Unit → ...)
+//    Self-referential tree supports unlimited depth via parentOrganizationId.
+// =============================================================================
+model Organization {
+  id            String         @id @default(cuid())
+  code          String         @unique
+  name          String
+  displayName   String
+  orgType       String         @default("MANAGEMENT") // COMPANY | DEPUTY | MANAGEMENT | UNIT | DEPARTMENT | GROUP | OTHER
+  level         Int            @default(0) // 0=company, 1=deputy, 2=management, 3=unit, ...
+  parentOrgId   String?
+  parent        Organization?  @relation("OrgTree", fields: [parentOrgId], references: [id], onDelete: SetNull)
+  children      Organization[] @relation("OrgTree")
+  responsibleId String?
+  responsible   User?          @relation("OrgResponsible", fields: [responsibleId], references: [id])
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  createdBy     String?
+  updatedBy     String?
+
+  // reverse relations
+  dictionaryEntries  UnitDictionary[]
+  ownedProjects      Project[]         @relation("ProjectOwner")
+  projectAssignments ProjectUnit[]
+  taskAssignments    TaskUnit[]
+  progressRecords    TaskProgressHistory[]
+
+  @@index([parentOrgId])
+  @@index([orgType])
+}
+
+// =============================================================================
+// 2. UNIT DICTIONARY — alias/synonym mapping for organizational unit names.
+//    Maps any raw Excel name (فاوا, آی تی, IT) → canonical Organization row.
+// =============================================================================
+model UnitDictionary {
+  id              String       @id @default(cuid())
+  canonicalOrgId  String
+  canonicalOrg    Organization @relation(fields: [canonicalOrgId], references: [id], onDelete: Cascade)
+  originalName    String // raw name as it appears in source (Excel)
+  normalizedName  String // normalized for matching (lowercased, trimmed, ZWNJ collapsed)
+  aliasType       String       @default("ALIAS") // ALIAS | SYNONYM | ABBREVIATION | LEGACY | ALTERNATIVE | TYPO | IMPORTED
+  source          String       @default("EXCEL") // EXCEL | MANUAL | IMPORT
+  confidence      Float        @default(1.0) // 0..1
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+
+  @@unique([canonicalOrgId, originalName])
+  @@index([normalizedName])
+  @@index([canonicalOrgId])
+}
+
+// =============================================================================
+// 3. DICTIONARY TERM — general dictionary for mapping any entity term.
+// =============================================================================
+model DictionaryTerm {
+  id             String   @id @default(cuid())
+  entityType     String // ORGANIZATION | PROJECT | TASK | STATUS | PRIORITY | ...
+  canonicalId    String // id of the canonical entity
+  originalTerm   String
+  normalizedTerm String
+  termType       String   @default("ALIAS") // SYNONYM | ALIAS | ABBREVIATION | LEGACY | ALTERNATIVE | TYPO | IMPORTED
+  source         String   @default("EXCEL")
+  confidence     Float    @default(1.0)
+  notes          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  @@unique([entityType, originalTerm])
+  @@index([entityType, normalizedTerm])
+}
+
+// =============================================================================
+// 4. STATUS DICTIONARY — controlled vocabulary for statuses (no free text).
+// =============================================================================
+model StatusDictionary {
+  id          String   @id @default(cuid())
+  statusCode  String   @unique // NOT_STARTED | IN_PROGRESS | COMPLETED | DELAYED | ON_HOLD | CANCELLED
+  statusName  String // Persian display name
+  entityType  String   @default("TASK") // TASK | PROJECT | PROGRAM
+  description String?
+  color       String? // hex/tailwind hint
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+// =============================================================================
+// 5. USER — for audit + ownership.
+// =============================================================================
+model User {
+  id        String         @id @default(cuid())
+  email     String         @unique
+  name      String
+  role      String         @default("VIEWER") // ADMIN | MANAGER | EDITOR | VIEWER
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  responsibleForOrg Organization[]         @relation("OrgResponsible")
+  progressRecords   TaskProgressHistory[]
+  auditLogs         AuditLog[]
+}
+
+// =============================================================================
+// 6. PROJECT / PROGRAM — independent program entity (each Excel sheet = 1 program).
+// =============================================================================
+model Project {
+  id              String      @id @default(cuid())
+  projectCode     String      @unique // e.g. PRG-1405-بانک-بیمه-7
+  projectName     String
+  programTitle    String? // عنوان برنامه
+  projectType     String       @default("PROGRAM") // PROGRAM | PROJECT | SUBPROJECT
+  ownerOrgId      String? // مدیریت اصلی متولی
+  ownerOrg        Organization? @relation("ProjectOwner", fields: [ownerOrgId], references: [id], onDelete: SetNull)
+  parentProjectId String?
+  parentProject   Project?    @relation("ProjectTree", fields: [parentProjectId], references: [id], onDelete: SetNull)
+  childProjects   Project[]   @relation("ProjectTree")
+  description     String?
+  goal            String? // هدف برنامه
+  year            Int         @default(1405) // Jalali year
+  programNumber   Int? // شماره برنامه inside the management
+  startDate       DateTime? // planned start (Gregorian, derived from Jalali)
+  endDate         DateTime? // planned end (Gregorian, derived from Jalali)
+  startJalali     String? // raw "1405/03/01" or "اردیبهشت 1405"
+  endJalali       String?
+  plannedDuration Int? // days
+  status          String      @default("NOT_STARTED")
+  priority        String      @default("NORMAL") // LOW | NORMAL | HIGH | CRITICAL
+  overallWeight   Float       @default(100) // وزن برنامه (percent)
+  progressPercent Float       @default(0) // rolled-up weighted progress
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  createdBy       String?
+  updatedBy       String?
+
+  tasks        Task[]
+  unitLinks    ProjectUnit[]
+  progressLogs ProjectProgressHistory[]
+
+  @@index([ownerOrgId])
+  @@index([parentProjectId])
+  @@index([year])
+}
+
+// =============================================================================
+// 7. PROJECT UNITS — many-to-many Project ↔ Organization with role.
+// =============================================================================
+model ProjectUnit {
+  id                   String       @id @default(cuid())
+  projectId            String
+  project              Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  orgId                String
+  org                  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  roleType             String       @default("RESPONSIBLE") // OWNER | RESPONSIBLE | COLLABORATOR | SUPERVISOR | CONSULTANT | APPROVER
+  responsibilityWeight Float        @default(0)
+  isPrimary            Boolean      @default(false)
+  participationPercent Float        @default(0)
+  createdAt            DateTime     @default(now())
+
+  @@unique([projectId, orgId, roleType])
+  @@index([projectId])
+  @@index([orgId])
+}
+
+// =============================================================================
+// 8. TASK — activities/subtasks. Self-referential for sub-tasks.
+// =============================================================================
+model Task {
+  id              String       @id @default(cuid())
+  projectId       String
+  project         Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentTaskId    String?
+  parentTask      Task?        @relation("TaskTree", fields: [parentTaskId], references: [id], onDelete: SetNull)
+  childTasks      Task[]       @relation("TaskTree")
+  taskCode        String? // e.g. T-001
+  taskName        String // شرح عملیات / اقدامات
+  description     String?
+  taskType        String       @default("ACTIVITY") // ACTIVITY | DELIVERABLE | MILESTONE | PHASE
+  sequenceNo      Int          @default(0) // ردیف
+  weight          Float        @default(0) // وزن هر عملیات
+  progressPercent Float        @default(0)
+  status          String       @default("NOT_STARTED")
+  startDate       DateTime?
+  endDate         DateTime?
+  startJalali     String?
+  endJalali       String?
+  duration        Int? // days
+  isMilestone     Boolean      @default(false)
+  target          String? // هدف کمی
+  prereq          String? // پیش‌نیازی گام‌های برنامه
+  notes           String? // ملاحظات
+  activeMonths    String? // JSON array of month indices [1,2,3] within the project year
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  createdBy       String?
+  updatedBy       String?
+
+  unitLinks       TaskUnit[]
+  depsAsPredecessor TaskDependency[] @relation("DepPredecessor")
+  depsAsSuccessor   TaskDependency[] @relation("DepSuccessor")
+  progressHistory TaskProgressHistory[]
+
+  @@index([projectId])
+  @@index([parentTaskId])
+  @@index([sequenceNo])
+}
+
+// =============================================================================
+// 9. TASK UNITS — many-to-many Task ↔ Organization (executor units).
+// =============================================================================
+model TaskUnit {
+  id        String       @id @default(cuid())
+  taskId    String
+  task      Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  roleType  String       @default("EXECUTOR") // EXECUTOR | OWNER | COLLABORATOR
+  isPrimary Boolean      @default(false)
+  createdAt DateTime     @default(now())
+
+  @@unique([taskId, orgId])
+  @@index([taskId])
+  @@index([orgId])
+}
+
+// =============================================================================
+// 10. TASK DEPENDENCIES — MS Project style FS/SS/FF/SF + lag.
+// =============================================================================
+model TaskDependency {
+  id                String @id @default(cuid())
+  predecessorTaskId String
+  predecessor       Task   @relation("DepPredecessor", fields: [predecessorTaskId], references: [id], onDelete: Cascade)
+  successorTaskId   String
+  successor         Task   @relation("DepSuccessor", fields: [successorTaskId], references: [id], onDelete: Cascade)
+  dependencyType    String @default("FS") // FS | SS | FF | SF
+  lag               Int    @default(0) // days
+  createdAt         DateTime @default(now())
+
+  @@unique([predecessorTaskId, successorTaskId, dependencyType])
+  @@index([successorTaskId])
+}
+
+// =============================================================================
+// 11. TASK PROGRESS HISTORY — time-series of progress (for S-Curve, trends).
+// =============================================================================
+model TaskProgressHistory {
+  id                       String       @id @default(cuid())
+  taskId                   String
+  task                     Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  orgId                    String?
+  org                      Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  reportDate               DateTime
+  reportJalali             String?
+  progressPercent          Float        @default(0)
+  plannedProgressPercent   Float        @default(0)
+  actualProgressPercent    Float        @default(0)
+  comment                  String?
+  recordedById             String?
+  recordedBy               User?        @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt                DateTime     @default(now())
+
+  @@index([taskId, reportDate])
+  @@index([orgId])
+}
+
+// =============================================================================
+// 12. PROJECT PROGRESS HISTORY — rolled-up project progress snapshots.
+// =============================================================================
+model ProjectProgressHistory {
+  id                     String   @id @default(cuid())
+  projectId              String
+  project                Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reportDate             DateTime
+  reportJalali           String?
+  progressPercent        Float    @default(0)
+  plannedProgressPercent Float    @default(0)
+  createdAt              DateTime @default(now())
+
+  @@index([projectId, reportDate])
+}
+
+// =============================================================================
+// 13. AUDIT LOG — change tracking for sensitive entities.
+// =============================================================================
+model AuditLog {
+  id         String   @id @default(cuid())
+  entityType String // PROJECT | TASK | ORGANIZATION | ...
+  entityId   String
+  action     String // CREATE | UPDATE | DELETE
+  oldValue   String? // JSON
+  newValue   String? // JSON
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+// =============================================================================
+// 14. RAW IMPORT BATCH — tracks an ETL run.
+// =============================================================================
+model ImportBatch {
+  id              String    @id @default(cuid())
+  fileName        String
+  batchLabel      String? // friendly label
+  startedAt       DateTime  @default(now())
+  finishedAt      DateTime?
+  sheetsProcessed Int       @default(0)
+  rowsProcessed   Int       @default(0)
+  status          String    @default("RUNNING") // RUNNING | DONE | FAILED
+  notes           String?
+
+  rawSheets RawSheetImport[]
+}
+
+// =============================================================================
+// 15. RAW SHEET IMPORT — one record per imported sheet.
+// =============================================================================
+model RawSheetImport {
+  id           String   @id @default(cuid())
+  batchId      String
+  batch        ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sheetName    String
+  rowCount     Int      @default(0)
+  projectTitle String?
+  managerRaw   String?
+  programTitle String?
+  programNum   Int?
+  weight       Float?
+  startDateRaw String?
+  endDateRaw   String?
+  goalRaw      String?
+  mappedProjectId String?
+  status       String   @default("IMPORTED")
+  importedAt   DateTime @default(now())
+
+  rawRows RawProgramRow[]
+
+  @@unique([batchId, sheetName])
+  @@index([batchId])
+}
+
+// =============================================================================
+// 16. RAW PROGRAM ROW — one record per raw task row in a sheet.
+// =============================================================================
+model RawProgramRow {
+  id             String         @id @default(cuid())
+  sheetImportId  String
+  sheetImport    RawSheetImport @relation(fields: [sheetImportId], references: [id], onDelete: Cascade)
+  rowNumber      Int
+  rawJson        String // full raw row cells as JSON string
+  rowNoRaw       String?
+  taskDesc       String?
+  weight         Float?
+  executorsRaw   String?
+  target         String?
+  prereq         String?
+  notes          String?
+  activeMonthsRaw String? // JSON array of month names
+  mappedTaskId   String?
+  mappingStatus  String         @default("PENDING") // PENDING | MAPPED | UNMAPPED | CONFLICT
+  createdAt      DateTime       @default(now())
+
+  @@index([sheetImportId])
+  @@index([mappingStatus])
+}
