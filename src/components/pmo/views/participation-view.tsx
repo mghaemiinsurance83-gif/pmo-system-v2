@@ -127,6 +127,8 @@ interface ParticipationDetail {
     endJalali: string | null;
     owner: { id: string; name: string; code: string } | null;
   };
+  referenceLabel?: string;
+  referenceMonth?: number;
   timeRange: { fromMonth: number; toMonth: number };
   totalSteps: number;
   inRangeSteps: number;
@@ -575,6 +577,12 @@ function ProgramDetailPanel({
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-bold text-foreground">{program.name}</h3>
                 <StatusBadge status={program.status} />
+                {detail.referenceLabel && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-teal-200/60 bg-teal-50 dark:border-teal-900/40 dark:bg-teal-950/30 px-2 py-0.5 text-[10px] font-medium text-teal-700 dark:text-teal-300" title="وضعیت بر اساس این تاریخ محاسبه شده">
+                    <CalendarRange className="h-3 w-3" />
+                    مرجع: {detail.referenceLabel}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground mt-1 tabular-nums">
                 {program.code} • برنامه شماره {toFa(program.programNumber || "—")} • سال {toFa(program.year)}

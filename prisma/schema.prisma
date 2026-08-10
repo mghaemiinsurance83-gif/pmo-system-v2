@@ -313,6 +313,22 @@ model AuditLog {
 }
 
 // =============================================================================
+// 13b. SYSTEM SETTING — single-source config (reference date, operational year, ...).
+//      The "reference date" (تاریخ مرجع) is the as-of reporting date ("today" for
+//      the system). All status / progress / delay computations read it from here so
+//      that changing one value updates every report consistently.
+// =============================================================================
+model SystemSetting {
+  id           String   @id @default(cuid())
+  key          String   @unique // e.g. referenceDate, operationalYear
+  value        String // JSON-serializable scalar (Jalali "1405/07/15", number, etc.)
+  dataType     String   @default("string") // string | number | boolean | json
+  description  String?
+  updatedAt    DateTime @updatedAt
+  updatedBy    String?
+}
+
+// =============================================================================
 // 14. RAW IMPORT BATCH — tracks an ETL run.
 // =============================================================================
 model ImportBatch {

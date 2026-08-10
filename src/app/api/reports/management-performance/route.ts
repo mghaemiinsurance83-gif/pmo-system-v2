@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getReferenceDate, computeDynamicStatus, monthFromJalali } from "@/lib/system";
 
 export async function GET() {
-  // management performance ranking
+  const ref = await getReferenceDate();
+
   const managements = await db.organization.findMany({
     where: { orgType: "MANAGEMENT" },
     include: {
-      ownedProjects: { select: { id: true, progressPercent: true, overallWeight: true, status: true } },
+      ownedProjects: { select: { id: true, progressPercent: true, overallWeight: true, startJalali: true, endJalali: true } },
       parent: { select: { name: true } },
     },
     orderBy: { name: "asc" },
@@ -27,9 +29,13 @@ export async function GET() {
       wSum += w;
       pSum += p.progressPercent * w;
       taskCount += pTaskCount.get(p.id) || 0;
-      if (p.status === "COMPLETED") completed++;
-      else if (p.status === "IN_PROGRESS") inProgress++;
-      else if (p.status === "DELAYED") delayed++;
+      // DYNAMIC status based on reference date
+      const startM = monthFromJalali(p.startJalali);
+      const endM = monthFromJalali(p.endJalali);
+      const dyn = computeDynamicStatus(p.progressPercent, startM, endM, ref.jm);
+      if (dyn === "COMPLETED") completed++;
+      else if (dyn === "IN_PROGRESS") inProgress++;
+      else if (dyn === "DELAYED") delayed++;
       else notStarted++;
     }
     return {
@@ -49,5 +55,5 @@ export async function GET() {
 
   items.sort((a, b) => b.progress - a.progress);
 
-  return NextResponse.json({ items });
+  return NextResponse.json({ items, referenceLabel: ref.monthLabel });
 }

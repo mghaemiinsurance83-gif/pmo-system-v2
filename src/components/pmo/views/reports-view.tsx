@@ -117,7 +117,7 @@ export function ReportsView() {
   return (
     <div className="space-y-4">
       <SectionCard
-        title="کنترل phạm scope گزارش"
+        title="کنترل محدوده گزارش"
         description="محدوده گزارش را انتخاب کنید — پیشرفت وزنی در آن سطح محاسبه می‌شود"
         bodyClassName="p-3"
       >

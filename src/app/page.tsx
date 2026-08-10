@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -15,6 +15,7 @@ import {
   Sun,
   Menu,
   X,
+  CalendarClock,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import { ReportsView } from "@/components/pmo/views/reports-view";
 import { DataModelView } from "@/components/pmo/views/data-model-view";
 import { RawDataView } from "@/components/pmo/views/raw-data-view";
 import { ParticipationView } from "@/components/pmo/views/participation-view";
+import { apiFetch } from "@/lib/api";
 
 type ViewId =
   | "dashboard"
@@ -71,6 +73,13 @@ function ThemeToggle() {
 export default function Home() {
   const [view, setView] = useState<ViewId>("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [refLabel, setRefLabel] = useState<string>("");
+
+  useEffect(() => {
+    apiFetch<{ monthLabel: string }>("/api/system/settings")
+      .then((s) => setRefLabel(s.monthLabel))
+      .catch(() => {});
+  }, []);
 
   const changeView = useCallback((v: ViewId) => {
     setView(v);
@@ -101,10 +110,12 @@ export default function Home() {
             </div>
           </div>
           <div className="mr-auto flex items-center gap-1.5">
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-teal-500/10 px-2.5 py-1 text-[11px] font-medium text-teal-700 dark:text-teal-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-pulse" />
-              دادهٔ زنده
-            </span>
+            {refLabel && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-teal-200/60 bg-teal-50 dark:border-teal-900/40 dark:bg-teal-950/30 px-2.5 py-1 text-[11px] font-medium text-teal-700 dark:text-teal-300" title="تاریخ مرجع گزارش‌ها — همه گزارش‌ها بر اساس این تاریخ به‌روز می‌شوند">
+                <CalendarClock className="h-3.5 w-3.5" />
+                تاریخ مرجع: {refLabel}
+              </span>
+            )}
             <ThemeToggle />
           </div>
         </div>

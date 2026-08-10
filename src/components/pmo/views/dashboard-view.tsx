@@ -22,11 +22,15 @@ import {
 import { cn } from "@/lib/utils";
 
 interface DashboardData {
+  referenceLabel?: string;
+  referenceMonth?: number;
   kpis: {
     totalProjects: number;
     totalTasks: number;
     totalOrgs: number;
     totalManagements: number;
+    totalDeputies: number;
+    totalIndependents: number;
     overallProgress: number;
     avgProgress: number;
   };
@@ -75,22 +79,26 @@ export function DashboardView() {
   const statusData = Object.entries(data.taskStatusDist).map(([k, v]) => ({ name: STATUS_FA[k] || k, value: v, color: STATUS_COLORS[k] || "#94a3b8" }));
   const totalTasks = statusData.reduce((s, d) => s + d.value, 0);
 
-  // deputy bar (top 8)
-  const deputyBars = data.deputyRollup.slice(0, 8).map((d) => ({
-    name: d.name.replace("معاونت ", ""),
-    progress: d.progress,
-    projects: d.projectCount,
-  }));
+  // deputy bar (top 8) — truncate long names for the Y-axis
+  const deputyBars = data.deputyRollup.slice(0, 8).map((d) => {
+    const short = d.name.replace("معاونت ", "");
+    return {
+      name: short.length > 18 ? short.slice(0, 17) + "…" : short,
+      fullName: short,
+      progress: d.progress,
+      projects: d.projectCount,
+    };
+  });
 
   return (
     <div className="space-y-5">
       {/* KPI cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <KpiCard label="پیشرفت کلی شرکت" value={faPercent(kpis.overallProgress)} accent="teal" icon={<TrendingUp className="h-5 w-5" />} hint="وزنی Roll-up" />
-        <KpiCard label="تعداد برنامه‌ها" value={kpis.totalProjects} accent="violet" icon={<FolderKanban className="h-5 w-5" />} hint="سال ۱۴۰۵" />
+        <KpiCard label="تعداد برنامه‌ها" value={kpis.totalProjects} accent="violet" icon={<FolderKanban className="h-5 w-5" />} hint={`سال ${toFa(kpis.totalProjects ? 1405 : 1405)}`} />
         <KpiCard label="تعداد فعالیت‌ها" value={kpis.totalTasks} accent="amber" icon={<Activity className="h-5 w-5" />} hint="در همه برنامه‌ها" />
         <KpiCard label="مدیریت‌های متولی" value={kpis.totalManagements} accent="emerald" icon={<Building2 className="h-5 w-5" />} hint="واحد سازمانی" />
-        <KpiCard label="معاونت‌ها" value={6} accent="rose" icon={<Network className="h-5 w-5" />} hint="ساختار سلسله‌مراتبی" />
+        <KpiCard label="معاونت‌ها + مستقل" value={`${toFa(kpis.totalDeputies)}+${toFa(kpis.totalIndependents)}`} accent="rose" icon={<Network className="h-5 w-5" />} hint={`${toFa(kpis.totalDeputies)} معاونت، ${toFa(kpis.totalIndependents)} مدیریت مستقل`} />
         <KpiCard label="میانگین پیشرفت" value={faPercent(kpis.avgProgress)} accent="teal" icon={<CheckCircle2 className="h-5 w-5" />} hint="ساده (غیروزنی)" />
       </div>
 
@@ -161,9 +169,10 @@ export function DashboardView() {
               <BarChart data={deputyBars} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.9 0 0)" horizontal={false} />
                 <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}٪`} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fontFamily: "inherit" }} width={110} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fontFamily: "inherit" }} width={130} />
                 <Tooltip
                   formatter={(v: number) => [`${toFa(v)}٪`, "پیشرفت"]}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName || ""}
                   contentStyle={{ fontFamily: "inherit", fontSize: 12, borderRadius: 8 }}
                 />
                 <Bar dataKey="progress" radius={[0, 6, 6, 0]} barSize={18}>
@@ -200,7 +209,7 @@ export function DashboardView() {
       </div>
 
       {/* Low progress projects */}
-      <SectionCard title="برنامه‌های نیازمند توجه" description="کمترین پیشرفت در میان ۱۶۰ برنامه" bodyClassName="p-0">
+      <SectionCard title="برنامه‌های نیازمند توجه" description={`کمترین پیشرفت در میان ${toFa(kpis.totalProjects)} برنامه — بر اساس تاریخ مرجع ${data.referenceLabel || ""}`} bodyClassName="p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-right text-sm">
             <thead className="bg-muted/50 text-xs text-muted-foreground">

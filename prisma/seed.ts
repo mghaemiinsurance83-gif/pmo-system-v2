@@ -773,6 +773,22 @@ async function main() {
 
   await db.importBatch.update({ where: { id: batch.id }, data: { finishedAt: new Date(), sheetsProcessed: projectCount, rowsProcessed: taskCount, status: "DONE" } });
 
+  // ── Seed system settings (single-source reference date) ─────────────────
+  // The reference date (تاریخ مرجع) = "today" for the system. Seeded to مهر ۱۴۰۵
+  // (AS_OF_MONTH=7) so the simulated progress data and the dynamic status
+  // computations agree. Editable later via /api/system/settings.
+  await db.systemSetting.upsert({
+    where: { key: "operationalYear" },
+    create: { key: "operationalYear", value: "1405", dataType: "number", description: "سال عملیاتی" },
+    update: { value: "1405" },
+  });
+  await db.systemSetting.upsert({
+    where: { key: "referenceDate" },
+    create: { key: "referenceDate", value: "1405/07/15", dataType: "string", description: "تاریخ مرجع گزارش (تاریخ امروز سیستم)" },
+    update: { value: "1405/07/15" },
+  });
+  console.log(`   System reference date: 1405/07/15 (مهر ۱۴۰۵)`);
+
   console.log("\n" + "=".repeat(70));
   console.log("✅ ETL COMPLETE");
   console.log(`   Projects: ${projectCount}`);

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { progressTrend } from "@/lib/rollup";
+import { getReferenceDate, computeDynamicStatus, monthFromJalali } from "@/lib/system";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const ref = await getReferenceDate();
   const project = await db.project.findUnique({
     where: { id },
     include: {
@@ -50,12 +52,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     startJalali: project.startJalali,
     endJalali: project.endJalali,
     plannedDuration: project.plannedDuration,
-    status: project.status,
+    status: computeDynamicStatus(project.progressPercent, monthFromJalali(project.startJalali), monthFromJalali(project.endJalali), ref.jm),
+    storedStatus: project.status,
     priority: project.priority,
     overallWeight: project.overallWeight,
     progress: project.progressPercent,
     taskCount: project.tasks.length,
     totalWeight,
+    referenceDate: ref.jalali,
+    referenceMonth: ref.jm,
+    referenceLabel: ref.monthLabel,
     unitLinks: project.unitLinks.map((ul) => ({
       id: ul.id,
       org: ul.org,
@@ -70,7 +76,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       sequenceNo: t.sequenceNo,
       weight: t.weight,
       progress: t.progressPercent,
-      status: t.status,
+      status: computeDynamicStatus(t.progressPercent, monthFromJalali(t.startJalali), monthFromJalali(t.endJalali), ref.jm),
+      storedStatus: t.status,
       startJalali: t.startJalali,
       endJalali: t.endJalali,
       isMilestone: t.isMilestone,

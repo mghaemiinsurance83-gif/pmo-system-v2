@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getReferenceDate, computeDynamicStatus, monthFromJalali } from "@/lib/system";
 
 // GET /api/participation/programs/[id]?fromMonth=1&toMonth=12
 // Returns a program's steps (گام‌ها) with each collaborating management's share,
@@ -12,6 +13,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const toMonth = Math.max(1, Math.min(12, Number(searchParams.get("toMonth") || "12")));
   const lo = Math.min(fromMonth, toMonth);
   const hi = Math.max(fromMonth, toMonth);
+  const ref = await getReferenceDate();
 
   const project = await db.project.findUnique({
     where: { id },
@@ -73,6 +75,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       sharePercent: Math.round((100 / n) * 10) / 10,
     }));
 
+    // dynamic status for this step based on reference date
+    const tStartM = monthFromJalali(t.startJalali);
+    const tEndM = monthFromJalali(t.endJalali);
+    const dynStatus = computeDynamicStatus(t.progressPercent, tStartM, tEndM, ref.jm);
+
     steps.push({
       id: t.id,
       sequenceNo: t.sequenceNo,
@@ -80,7 +87,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       taskName: t.taskName,
       weight: w,
       progressPercent: t.progressPercent,
-      status: t.status,
+      status: dynStatus,
+      storedStatus: t.status,
       startJalali: t.startJalali,
       endJalali: t.endJalali,
       activeMonths,
@@ -145,13 +153,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       programNumber: project.programNumber,
       weight: project.overallWeight,
       progress: project.progressPercent,
-      status: project.status,
+      status: computeDynamicStatus(project.progressPercent, monthFromJalali(project.startJalali), monthFromJalali(project.endJalali), ref.jm),
+      storedStatus: project.status,
       startJalali: project.startJalali,
       endJalali: project.endJalali,
       owner: project.ownerOrg
         ? { id: project.ownerOrg.id, name: project.ownerOrg.name, code: project.ownerOrg.code }
         : null,
     },
+    referenceDate: ref.jalali,
+    referenceMonth: ref.jm,
+    referenceLabel: ref.monthLabel,
     timeRange: { fromMonth: lo, toMonth: hi },
     totalSteps: tasks.length,
     inRangeSteps: inRangeStepCount,
