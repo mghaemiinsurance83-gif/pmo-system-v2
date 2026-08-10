@@ -52,3 +52,21 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# database files
+db/*.db
+db/*.db-journal
+
+# process id files
+.zscripts/*.pid
+
+# upload/download user data
+/upload/
+/download/
+
+# tool results / temp
+tool-results/
+*.txt.bak
+
+# agent worklog
+worklog.md
