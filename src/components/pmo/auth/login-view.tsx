@@ -28,7 +28,8 @@ export function LoginView({ onSuccess, onCancel }: Props) {
       const csrfRes = await fetch("/api/auth/csrf", { credentials: "include" });
       const { csrfToken } = await csrfRes.json();
 
-      // 2. POST credentials directly with credentials: include so the session cookie is set
+      // 2. POST credentials directly with credentials: include so the session cookie is set.
+      //    Using json:"true" makes NextAuth return proper HTTP status codes (401 on failure).
       const loginRes = await fetch("/api/auth/callback/credentials", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -42,14 +43,28 @@ export function LoginView({ onSuccess, onCancel }: Props) {
         credentials: "include",
       });
 
+      // 401 = credentials rejected by authorize()
+      if (loginRes.status === 401) {
+        setError("نام کاربری یا رمز عبور نادرست است");
+        setLoading(false);
+        return;
+      }
+      // Other non-OK status = server error
       if (!loginRes.ok) {
         setError("خطا در ارتباط با سرور");
         setLoading(false);
         return;
       }
 
-      // 3. Verify session was created
-      const sessionRes = await fetch("/api/auth/session", { credentials: "include" });
+      // 3. Verify session was created.
+      //    cache: "no-store" is CRITICAL — without it, the browser may return a cached
+      //    empty session response from before login, causing a false "invalid credentials" error.
+      //    The small delay lets the browser commit the Set-Cookie from the POST response.
+      await new Promise((r) => setTimeout(r, 200));
+      const sessionRes = await fetch("/api/auth/session", {
+        credentials: "include",
+        cache: "no-store",
+      });
       const session = await sessionRes.json();
 
       setLoading(false);
@@ -57,9 +72,9 @@ export function LoginView({ onSuccess, onCancel }: Props) {
       if (session?.user) {
         // Session is set — hard reload so useSession picks up the cookie
         onSuccess?.();
-        // Hard reload to ensure SessionProvider re-initializes with the new cookie
         window.location.reload();
       } else {
+        // POST succeeded but session wasn't created — treat as auth failure
         setError("نام کاربری یا رمز عبور نادرست است");
       }
     } catch (err) {
