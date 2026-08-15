@@ -128,6 +128,7 @@ model User {
   progressRecords   TaskProgressHistory[]
   auditLogs         AuditLog[]
   documents         Document[]              @relation("DocUploader")
+  approvedDocuments Document[]              @relation("DocApprover")
   notifications     Notification[]
 
   @@index([orgId])
@@ -230,7 +231,8 @@ model Task {
   taskType        String       @default("ACTIVITY") // ACTIVITY | DELIVERABLE | MILESTONE | PHASE
   sequenceNo      Int          @default(0) // ردیف
   weight          Float        @default(0) // وزن هر عملیات
-  progressPercent Float        @default(0)
+  progressPercent Float        @default(0) // reported progress (set by manager)
+  approvedProgressPercent Float @default(0) // approved progress (after admin reviews documents)
   status          String       @default("NOT_STARTED")
   startDate       DateTime?
   endDate         DateTime?
@@ -471,6 +473,14 @@ model Document {
   uploadedBy       User?   @relation("DocUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
   uploadedAt       DateTime @default(now())
 
+  // Approval workflow: PENDING → APPROVED | REJECTED
+  approvalStatus   String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  approvedById     String?
+  approvedBy       User?    @relation("DocApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt       DateTime?
+  rejectionReason  String?
+  reviewedAt       DateTime?
+
   // Soft delete + versioning
   isActive         Boolean  @default(true)
   version          Int      @default(1)
@@ -482,6 +492,8 @@ model Document {
   @@index([projectId])
   @@index([orgId])
   @@index([uploadedById])
+  @@index([approvalStatus])
+  @@index([approvedById])
 }
 
 // =============================================================================

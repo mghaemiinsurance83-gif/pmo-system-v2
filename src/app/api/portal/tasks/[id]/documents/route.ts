@@ -38,6 +38,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       description: true,
       uploadedAt: true,
       uploadedBy: { select: { name: true } },
+      approvalStatus: true,
+      rejectionReason: true,
+      approvedAt: true,
+      approvedBy: { select: { name: true } },
     },
   });
 

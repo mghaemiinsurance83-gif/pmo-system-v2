@@ -22,10 +22,15 @@ export function AdminDashboard() {
     Promise.all([
       fetch("/api/dashboard", { credentials: "include" }).then(r => r.json()),
       fetch("/api/admin/users?pageSize=1", { credentials: "include" }).then(r => r.json()).catch(() => ({ meta: { total: 0 } })),
-    ]).then(([dash, users]) => {
+      fetch("/api/admin/documents?status=ALL&pageSize=1", { credentials: "include" }).then(r => r.json()).catch(() => ({ summary: { ALL: 0, PENDING: 0 } })),
+    ]).then(([dash, users, docs]) => {
       if (reqId.current === sig) {
         setData(dash);
-        setCounts(c => ({ ...c, users: users.meta?.total ?? 0 }));
+        setCounts(c => ({
+          ...c,
+          users: users.meta?.total ?? 0,
+          documents: docs.summary?.ALL ?? 0,
+        }));
         setLoading(false);
       }
     }).catch(() => setLoading(false));

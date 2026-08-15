@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { Search, ListTodo, FileText, UploadCloud, Download, Loader2, Calendar, Clock, ChevronLeft } from "lucide-react";
+import { Search, ListTodo, FileText, UploadCloud, Download, Loader2, Calendar, Clock, ChevronLeft, FileCheck2, FileX2, FileClock } from "lucide-react";
 import { DocumentUploader } from "./document-uploader";
 import { useSession } from "next-auth/react";
 
@@ -41,6 +41,10 @@ interface DocItem {
   description: string | null;
   uploadedAt: string;
   uploadedBy: { name: string } | null;
+  approvalStatus: string; // PENDING | APPROVED | REJECTED
+  rejectionReason: string | null;
+  approvedAt: string | null;
+  approvedBy: { name: string } | null;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -54,6 +58,13 @@ const STATUS_COLORS: Record<string, string> = {
   IN_PROGRESS: "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
   COMPLETED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
   DELAYED: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+};
+
+// Document approval status config
+const DOC_STATUS: Record<string, { label: string; icon: React.ElementType; classes: string }> = {
+  PENDING: { label: "در انتظار", icon: FileClock, classes: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
+  APPROVED: { label: "تأیید شده", icon: FileCheck2, classes: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  REJECTED: { label: "رد شده", icon: FileX2, classes: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" },
 };
 
 function fa(n: number | string) { return String(n).replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]); }
@@ -285,21 +296,34 @@ function TaskEditDialog({ taskId, canEdit, onClose, onSaved }: { taskId: string;
               <p className="text-xs text-muted-foreground text-center py-4">هنوز مستندی بارگذاری نشده</p>
             ) : (
               <div className="space-y-1.5 max-h-64 overflow-y-auto custom-scroll">
-                {docs.map((d) => (
-                  <div key={d.id} className="flex items-center gap-2 rounded-md border p-2 hover:bg-accent/50">
-                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate">{d.title || d.originalFileName}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {fa(fmtSize(d.sizeBytes))} • {d.forMonth ? PERSIAN_MONTHS[d.forMonth - 1] : "—"} • {d.uploadedBy?.name || "—"}
-                      </p>
+                {docs.map((d) => {
+                  const statusCfg = DOC_STATUS[d.approvalStatus] || DOC_STATUS.PENDING;
+                  const StatusIcon = statusCfg.icon;
+                  return (
+                    <div key={d.id} className="flex items-center gap-2 rounded-md border p-2 hover:bg-accent/50">
+                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-sm truncate">{d.title || d.originalFileName}</p>
+                          <span className={`inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] font-medium ${statusCfg.classes}`}>
+                            <StatusIcon className="h-2.5 w-2.5" />
+                            {statusCfg.label}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          {fa(fmtSize(d.sizeBytes))} • {d.forMonth ? PERSIAN_MONTHS[d.forMonth - 1] : "—"} • {d.uploadedBy?.name || "—"}
+                        </p>
+                        {d.approvalStatus === "REJECTED" && d.rejectionReason && (
+                          <p className="text-[10px] text-rose-600 dark:text-rose-400 mt-0.5">دلیل رد: {d.rejectionReason}</p>
+                        )}
+                      </div>
+                      <a href={`/api/portal/documents/${d.id}/download`} target="_blank" rel="noreferrer">
+                        <Button variant="ghost" size="icon" title="دانلود"><Download className="h-4 w-4" /></Button>
+                      </a>
+                      {canEdit && <Button variant="ghost" size="icon" onClick={() => deleteDoc(d.id)} title="حذف"><ChevronLeft className="h-4 w-4 text-destructive" /></Button>}
                     </div>
-                    <a href={`/api/portal/documents/${d.id}/download`} target="_blank" rel="noreferrer">
-                      <Button variant="ghost" size="icon" title="دانلود"><Download className="h-4 w-4" /></Button>
-                    </a>
-                    {canEdit && <Button variant="ghost" size="icon" onClick={() => deleteDoc(d.id)} title="حذف"><ChevronLeft className="h-4 w-4 text-destructive" /></Button>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

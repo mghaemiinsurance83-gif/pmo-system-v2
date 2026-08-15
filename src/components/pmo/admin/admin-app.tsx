@@ -4,7 +4,7 @@ import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, FolderKanban, ListTodo, BarChart3, FileText, ScrollText, Settings,
-  LogOut, Menu, X, Moon, Sun, CalendarClock, ChevronLeft, Shield,
+  LogOut, Menu, X, Moon, Sun, CalendarClock, ChevronLeft, Shield, FileCheck2,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -15,14 +15,16 @@ import { AdminUserEdit } from "./admin-user-edit";
 import { AdminProjects } from "./admin-projects";
 import { AdminTasks } from "./admin-tasks";
 import { AdminAuditLog } from "./admin-audit-log";
+import { AdminDocuments } from "./admin-documents";
 
-type AdminView = "dashboard" | "users" | "projects" | "tasks" | "reports" | "audit";
+type AdminView = "dashboard" | "users" | "projects" | "tasks" | "documents" | "reports" | "audit";
 
 const NAV: { id: AdminView; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "dashboard", label: "داشبورد", icon: LayoutDashboard, desc: "نمای کلی سامانه" },
   { id: "users", label: "مدیریت کاربران", icon: Users, desc: "لیست کاربران و نقش‌ها" },
   { id: "projects", label: "مدیریت پروژه‌ها", icon: FolderKanban, desc: "ایجاد و ویرایش پروژه‌ها" },
   { id: "tasks", label: "مدیریت گام‌ها", icon: ListTodo, desc: "ایجاد و ویرایش گام‌ها" },
+  { id: "documents", label: "تأیید مستندات", icon: FileCheck2, desc: "صف تأیید مستندات بارگذاری‌شده" },
   { id: "reports", label: "گزارشات کل", icon: BarChart3, desc: "آمار کل شرکت" },
   { id: "audit", label: "لاگ ممیزی", icon: ScrollText, desc: "تاریخچه تغییرات" },
 ];
@@ -139,6 +141,7 @@ export function AdminApp({ onExit }: { onExit: () => void }) {
             {view === "users" && editUserId && <AdminUserEdit userId={editUserId} onBack={() => setEditUserId(null)} />}
             {view === "projects" && <AdminProjects />}
             {view === "tasks" && <AdminTasks />}
+            {view === "documents" && <AdminDocuments />}
             {view === "reports" && <AdminDashboard />}
             {view === "audit" && <AdminAuditLog />}
           </div>
