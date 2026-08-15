@@ -78,7 +78,7 @@ export function PortalTasks() {
   useEffect(() => {
     const sig = ++reqId.current;
     const params = new URLSearchParams({ page: String(page), pageSize: "20", ...(search && { search }), ...(status !== "ALL" && { status }), ...(projectId && { projectId }) });
-    fetch(`/api/portal/tasks?${params}`)
+    fetch(`/api/portal/tasks?${params}`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => { if (reqId.current === sig) { setItems(d.data || []); setTotalPages(d.meta?.totalPages ?? 1); setTotal(d.meta?.total ?? 0); setLoading(false); } })
       .catch(() => setLoading(false));
@@ -160,7 +160,7 @@ export function PortalTasks() {
           setPage(page);
           const sig = ++reqId.current;
           const params = new URLSearchParams({ page: String(page), pageSize: "20", ...(search && { search }), ...(status !== "ALL" && { status }), ...(projectId && { projectId }) });
-          fetch(`/api/portal/tasks?${params}`).then(r=>r.json()).then(d=>{if(reqId.current===sig){setItems(d.data||[]);}});
+          fetch(`/api/portal/tasks?${params}`, { credentials: "include" }).then(r=>r.json()).then(d=>{if(reqId.current===sig){setItems(d.data||[]);}});
         }} />
       )}
     </div>
@@ -172,18 +172,19 @@ function TaskEditDialog({ taskId, canEdit, onClose, onSaved }: { taskId: string;
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [forMonth, setForMonth] = useState(new Date().getMonth() + 1);
+  const [forMonth, setForMonth] = useState(5); // default to current operational month (مرداد)
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/portal/tasks?pageSize=1000`).then(r=>r.json()),
-      fetch(`/api/portal/tasks/${taskId}/documents`).then(r=>r.json()),
-    ]).then(([tasksData, docsData]) => {
-      const t = (tasksData.data || []).find((x: TaskItem) => x.id === taskId);
-      setTask(t || null);
-      setProgress(t?.progressPercent ?? 0);
+      fetch(`/api/portal/tasks/${taskId}`, { credentials: "include" }).then(r=>r.json()),
+      fetch(`/api/portal/tasks/${taskId}/documents`, { credentials: "include" }).then(r=>r.json()),
+      fetch(`/api/system/settings`, { credentials: "include" }).then(r=>r.json()).catch(() => ({ jm: 5 })),
+    ]).then(([taskData, docsData, sysSettings]) => {
+      setTask(taskData.data || null);
+      setProgress(taskData.data?.progressPercent ?? 0);
+      setForMonth(sysSettings?.jm || 5);
       setDocs(docsData.data || []);
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -196,6 +197,7 @@ function TaskEditDialog({ taskId, canEdit, onClose, onSaved }: { taskId: string;
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ progressPercent: progress, forMonth, comment }),
+        credentials: "include",
       });
       if (res.ok) {
         toast.success("پیشرفت ثبت شد");
@@ -209,7 +211,7 @@ function TaskEditDialog({ taskId, canEdit, onClose, onSaved }: { taskId: string;
 
   async function deleteDoc(docId: string) {
     if (!confirm("حذف این مستند؟")) return;
-    const res = await fetch(`/api/portal/documents/${docId}`, { method: "DELETE" });
+    const res = await fetch(`/api/portal/documents/${docId}`, { method: "DELETE", credentials: "include" });
     if (res.ok) {
       setDocs(docs.filter((d) => d.id !== docId));
       toast.success("مستند حذف شد");
@@ -274,7 +276,7 @@ function TaskEditDialog({ taskId, canEdit, onClose, onSaved }: { taskId: string;
             </div>
 
             {canEdit && <DocumentUploader taskId={taskId} onUploaded={async () => {
-              const d = await fetch(`/api/portal/tasks/${taskId}/documents`).then(r=>r.json());
+              const d = await fetch(`/api/portal/tasks/${taskId}/documents`, { credentials: "include" }).then(r=>r.json());
               setDocs(d.data || []);
             }} />}
 

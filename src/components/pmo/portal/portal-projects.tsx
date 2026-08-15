@@ -54,7 +54,7 @@ export function PortalProjects({ onSelectProject }: { onSelectProject?: (id: str
   useEffect(() => {
     const sig = ++reqId.current;
     const params = new URLSearchParams({ page: String(page), pageSize: "12", ...(search && { search }), ...(status !== "ALL" && { status }) });
-    fetch(`/api/portal/projects?${params}`)
+    fetch(`/api/portal/projects?${params}`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => { if (reqId.current === sig) { setItems(d.data || []); setTotalPages(d.meta?.totalPages ?? 1); setTotal(d.meta?.total ?? 0); setLoading(false); } })
       .catch(() => setLoading(false));

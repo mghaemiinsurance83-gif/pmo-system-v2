@@ -20,8 +20,8 @@ export function AdminDashboard() {
   useEffect(() => {
     const sig = ++reqId.current;
     Promise.all([
-      fetch("/api/dashboard").then(r => r.json()),
-      fetch("/api/admin/users?pageSize=1").then(r => r.json()).catch(() => ({ meta: { total: 0 } })),
+      fetch("/api/dashboard", { credentials: "include" }).then(r => r.json()),
+      fetch("/api/admin/users?pageSize=1", { credentials: "include" }).then(r => r.json()).catch(() => ({ meta: { total: 0 } })),
     ]).then(([dash, users]) => {
       if (reqId.current === sig) {
         setData(dash);

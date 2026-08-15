@@ -33,7 +33,7 @@ export function PortalDocuments() {
     // Fetch all tasks then their documents — simpler: fetch from a dedicated endpoint
     // For now, fetch tasks (large) and aggregate
     const sig = ++reqId.current;
-    fetch("/api/portal/tasks?pageSize=1000")
+    fetch("/api/portal/tasks?pageSize=1000", { credentials: "include" })
       .then(r => r.json())
       .then(async (tasksData) => {
         const tasks = tasksData.data || [];
@@ -45,7 +45,7 @@ export function PortalDocuments() {
           const chunk = taskIds.slice(i, i + 20);
           const results = await Promise.all(
             chunk.map((tid: string) =>
-              fetch(`/api/portal/tasks/${tid}/documents`).then(r => r.json()).catch(() => ({ data: [] }))
+              fetch(`/api/portal/tasks/${tid}/documents`, { credentials: "include" }).then(r => r.json()).catch(() => ({ data: [] }))
             )
           );
           results.forEach((r, idx) => {
@@ -67,7 +67,7 @@ export function PortalDocuments() {
 
   async function deleteDoc(id: string) {
     if (!confirm("حذف این مستند؟")) return;
-    const res = await fetch(`/api/portal/documents/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/portal/documents/${id}`, { method: "DELETE", credentials: "include" });
     if (res.ok) { setItems(items.filter(d => d.id !== id)); toast.success("حذف شد"); }
   }
 

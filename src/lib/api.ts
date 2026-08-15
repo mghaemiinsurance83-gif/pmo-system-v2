@@ -8,7 +8,7 @@ export async function apiFetch<T = any>(path: string, opts?: { force?: boolean }
   if (!opts?.force && cached && now - cached.ts < TTL) {
     return cached.data as T;
   }
-  const res = await fetch(path);
+  const res = await fetch(path, { credentials: "include" });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`API ${path} → ${res.status}: ${text.slice(0, 120)}`);

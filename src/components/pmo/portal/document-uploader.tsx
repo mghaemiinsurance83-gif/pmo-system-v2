@@ -26,7 +26,7 @@ export function DocumentUploader({ taskId, onUploaded }: Props) {
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const res = await fetch(`/api/portal/tasks/${taskId}/documents`, { method: "POST", body: fd });
+      const res = await fetch(`/api/portal/tasks/${taskId}/documents`, { method: "POST", body: fd, credentials: "include" });
       if (res.ok) { toast.success("مستند بارگذاری شد"); onUploaded?.(); }
       else { const e = await res.json(); toast.error(e.error?.message || "خطا در آپلود"); }
     } catch { toast.error("خطای شبکه"); }

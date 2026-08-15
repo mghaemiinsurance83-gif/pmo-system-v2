@@ -36,7 +36,7 @@ export function AdminAuditLog() {
   useEffect(() => {
     const sig = ++reqId.current;
     const params = new URLSearchParams({ page: String(page), pageSize: "50", ...(entityType !== "ALL" && { entityType }), ...(action !== "ALL" && { action }) });
-    fetch(`/api/admin/audit-log?${params}`)
+    fetch(`/api/admin/audit-log?${params}`, { credentials: "include" })
       .then(r => r.json())
       .then(d => { if (reqId.current === sig) { setItems(d.data || []); setTotalPages(d.meta?.totalPages ?? 1); setTotal(d.meta?.total ?? 0); setLoading(false); } })
       .catch(() => setLoading(false));

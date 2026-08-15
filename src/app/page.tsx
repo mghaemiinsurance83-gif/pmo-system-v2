@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, getSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Network, GanttChartSquare, FolderKanban, BookMarked, BarChart3,
@@ -53,21 +54,48 @@ function ThemeToggle() {
 
 type Mode = "public" | "login" | "portal";
 
+interface SessionUser {
+  id: string;
+  name: string;
+  email?: string | null;
+  role: "ADMIN" | "MANAGER" | "LIAISON" | "VIEWER";
+  orgId: string | null;
+  username: string;
+}
+
 export default function Home() {
   const { data: session, status } = useSession();
   const [mode, setMode] = useState<Mode>("public");
   const [view, setView] = useState<ViewId>("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [refLabel, setRefLabel] = useState("");
+  // Direct session fetch — bypasses useSession cache issues in sandbox
+  const [directSession, setDirectSession] = useState<SessionUser | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
     apiFetch<{ dayLabel: string; monthLabel: string }>("/api/system/settings")
       .then((s) => setRefLabel(s.dayLabel || s.monthLabel))
       .catch(() => {});
-  }, []);
+    // Direct session check — more reliable than useSession in sandbox
+    fetch("/api/auth/session", { credentials: "include", cache: "no-store" })
+      .then((r) => r.json())
+      .then((s) => {
+        const u = s?.user || null;
+        setDirectSession(u);
+        setSessionChecked(true);
+        // Auto-redirect to portal if user is authenticated and still on public view
+        if (u && mode === "public") {
+          setMode("portal");
+        }
+      })
+      .catch(() => setSessionChecked(true));
+    // Also try to refresh useSession cache
+    getSession().catch(() => {});
+  }, [mode]); // re-check when mode changes (e.g., after login)
 
   // Loading state
-  if (status === "loading") {
+  if (!sessionChecked && status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-muted-foreground">در حال بارگذاری...</div>
@@ -75,7 +103,9 @@ export default function Home() {
     );
   }
 
-  const isAuthed = status === "authenticated" && !!session?.user;
+  // Prefer useSession if authenticated, fall back to direct fetch
+  const effectiveSession = (status === "authenticated" && session?.user) ? (session.user as SessionUser) : directSession;
+  const isAuthed = !!effectiveSession;
 
   // Login view (shown when user clicks login and is not yet authenticated)
   if (mode === "login" && !isAuthed) {
@@ -84,7 +114,7 @@ export default function Home() {
 
   // Authenticated + portal mode: show portal or admin based on role
   if (isAuthed && mode === "portal") {
-    if (session!.user.role === "ADMIN") {
+    if (effectiveSession!.role === "ADMIN") {
       return <AdminApp onExit={() => setMode("public")} />;
     }
     return <PortalApp onExit={() => setMode("public")} />;

@@ -24,7 +24,7 @@ export function PortalReports() {
 
   useEffect(() => {
     const sig = ++reqId.current;
-    fetch("/api/portal/reports")
+    fetch("/api/portal/reports", { credentials: "include" })
       .then(r => r.json())
       .then(d => { if (reqId.current === sig) { setData(d.data); setLoading(false); } })
       .catch(() => setLoading(false));

@@ -45,8 +45,8 @@ export function AdminUserEdit({ userId, onBack }: { userId: string; onBack: () =
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/admin/users/${userId}`).then(r => r.json()),
-      fetch("/api/admin/orgs").then(r => r.json()),
+      fetch(`/api/admin/users/${userId}`, { credentials: "include" }).then(r => r.json()),
+      fetch("/api/admin/orgs", { credentials: "include" }).then(r => r.json()),
     ]).then(([u, o]) => {
       setUser(u);
       setRole(u.role);
@@ -65,6 +65,7 @@ export function AdminUserEdit({ userId, onBack }: { userId: string; onBack: () =
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email: email || null, role, orgId: orgId || null, password: password || undefined, liaisonOrgIds }),
+        credentials: "include",
       });
       if (res.ok) { toast.success("ذخیره شد"); onBack(); }
       else { const e = await res.json(); toast.error(e.error?.message || "خطا"); }

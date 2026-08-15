@@ -49,7 +49,7 @@ export function AdminUsers({ onEdit }: { onEdit: (id: string) => void }) {
   const load = () => {
     const sig = ++reqId.current;
     const params = new URLSearchParams({ page: String(page), pageSize: "20", ...(search && { search }), ...(role !== "ALL" && { role }) });
-    fetch(`/api/admin/users?${params}`)
+    fetch(`/api/admin/users?${params}`, { credentials: "include" })
       .then(r => r.json())
       .then(d => { if (reqId.current === sig) { setItems(d.data || []); setTotalPages(d.meta?.totalPages ?? 1); setTotal(d.meta?.total ?? 0); setLoading(false); } })
       .catch(() => setLoading(false));
@@ -59,7 +59,7 @@ export function AdminUsers({ onEdit }: { onEdit: (id: string) => void }) {
 
   async function toggleActive(u: UserItem) {
     if (!confirm(u.isActive ? "غیرفعال کردن این کاربر؟" : "فعال‌سازی مجدد؟")) return;
-    const res = await fetch(`/api/admin/users/${u.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isActive: !u.isActive }) });
+    const res = await fetch(`/api/admin/users/${u.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ isActive: !u.isActive }), credentials: "include" });
     if (res.ok) { toast.success("به‌روزرسانی شد"); load(); }
   }
 
@@ -131,7 +131,7 @@ function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreat
   const [form, setForm] = useState({ username: "", name: "", email: "", role: "VIEWER", orgId: "", password: "" });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { fetch("/api/admin/orgs").then(r => r.json()).then(d => setOrgs(d.data || [])).catch(() => {}); }, []);
+  useEffect(() => { fetch("/api/admin/orgs", { credentials: "include" }).then(r => r.json()).then(d => setOrgs(d.data || [])).catch(() => {}); }, []);
 
   async function submit() {
     setSaving(true);
@@ -139,6 +139,7 @@ function CreateUserDialog({ onClose, onCreated }: { onClose: () => void; onCreat
       const res = await fetch("/api/admin/users", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, email: form.email || undefined, orgId: form.orgId || undefined, liaisonOrgIds: [] }),
+        credentials: "include",
       });
       if (res.ok) { toast.success("کاربر ایجاد شد"); onCreated(); }
       else { const e = await res.json(); toast.error(e.error?.message || "خطا"); }

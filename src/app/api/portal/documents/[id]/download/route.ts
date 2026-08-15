@@ -3,12 +3,13 @@ import { db } from "@/lib/db";
 import { getCurrentUserWithScope } from "@/lib/rbac";
 import { readFile } from "@/lib/storage";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { user, scope } = await getCurrentUserWithScope();
   if (!user) return Response.json({ error: { code: "UNAUTHORIZED" } }, { status: 401 });
 
   const doc = await db.document.findUnique({
-    where: { id: params.id },
+    where: { id: id },
     select: { id: true, storagePath: true, originalFileName: true, mimeType: true, isActive: true, orgId: true, projectId: true },
   });
   if (!doc || !doc.isActive) return Response.json({ error: { code: "NOT_FOUND" } }, { status: 404 });

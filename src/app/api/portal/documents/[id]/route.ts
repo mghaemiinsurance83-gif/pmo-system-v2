@@ -4,14 +4,15 @@ import { getCurrentUserWithScope, canEdit } from "@/lib/rbac";
 import { markFileDeleted } from "@/lib/storage";
 import { audit } from "@/lib/audit";
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { user, scope } = await getCurrentUserWithScope();
   if (!user) return Response.json({ error: { code: "UNAUTHORIZED" } }, { status: 401 });
   if (!canEdit(user.role))
     return Response.json({ error: { code: "FORBIDDEN" } }, { status: 403 });
 
   const doc = await db.document.findUnique({
-    where: { id: params.id },
+    where: { id: id },
     select: { id: true, storagePath: true, uploadedById: true, taskId: true, projectId: true, originalFileName: true, orgId: true },
   });
   if (!doc) return Response.json({ error: { code: "NOT_FOUND" } }, { status: 404 });

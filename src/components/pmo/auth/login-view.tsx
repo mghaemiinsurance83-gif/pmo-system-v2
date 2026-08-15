@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,12 +23,48 @@ export function LoginView({ onSuccess, onCancel }: Props) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const res = await signIn("credentials", { username, password, redirect: false });
-    setLoading(false);
-    if (res?.error) {
-      setError("نام کاربری یا رمز عبور نادرست است");
-    } else if (res?.ok) {
-      onSuccess?.();
+    try {
+      // 1. Get CSRF token
+      const csrfRes = await fetch("/api/auth/csrf", { credentials: "include" });
+      const { csrfToken } = await csrfRes.json();
+
+      // 2. POST credentials directly with credentials: include so the session cookie is set
+      const loginRes = await fetch("/api/auth/callback/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          username,
+          password,
+          csrfToken,
+          callbackUrl: window.location.origin + "/",
+          json: "true",
+        }).toString(),
+        credentials: "include",
+      });
+
+      if (!loginRes.ok) {
+        setError("خطا در ارتباط با سرور");
+        setLoading(false);
+        return;
+      }
+
+      // 3. Verify session was created
+      const sessionRes = await fetch("/api/auth/session", { credentials: "include" });
+      const session = await sessionRes.json();
+
+      setLoading(false);
+
+      if (session?.user) {
+        // Session is set — hard reload so useSession picks up the cookie
+        onSuccess?.();
+        // Hard reload to ensure SessionProvider re-initializes with the new cookie
+        window.location.reload();
+      } else {
+        setError("نام کاربری یا رمز عبور نادرست است");
+      }
+    } catch (err) {
+      setLoading(false);
+      setError("خطا در ارتباط با سرور");
     }
   }
 

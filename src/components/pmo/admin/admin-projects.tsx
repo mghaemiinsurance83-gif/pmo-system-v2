@@ -39,18 +39,18 @@ export function AdminProjects() {
   const load = () => {
     const sig = ++reqId.current;
     const params = new URLSearchParams({ page: String(page), pageSize: "20", ...(search && { search }) });
-    fetch(`/api/admin/projects?${params}`)
+    fetch(`/api/admin/projects?${params}`, { credentials: "include" })
       .then(r => r.json())
       .then(d => { if (reqId.current === sig) { setItems(d.data || []); setTotalPages(d.meta?.totalPages ?? 1); setTotal(d.meta?.total ?? 0); setLoading(false); } })
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { fetch("/api/admin/orgs").then(r=>r.json()).then(d=>setOrgs(d.data||[])).catch(()=>{}); }, []);
+  useEffect(() => { fetch("/api/admin/orgs", { credentials: "include" }).then(r=>r.json()).then(d=>setOrgs(d.data||[])).catch(()=>{}); }, []);
   useEffect(load, [page, search]);
 
   async function del(id: string) {
     if (!confirm("حذف این پروژه؟")) return;
-    const res = await fetch(`/api/admin/projects/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/projects/${id}`, { method: "DELETE", credentials: "include" });
     if (res.ok) { toast.success("حذف شد"); load(); }
   }
 
@@ -115,7 +115,7 @@ function ProjectDialog({ orgs, projectId, onClose, onSaved }: { orgs: Org[]; pro
 
   useEffect(() => {
     if (projectId) {
-      fetch(`/api/admin/projects?pageSize=1000`).then(r=>r.json()).then(d => {
+      fetch(`/api/admin/projects?pageSize=1000`, { credentials: "include" }).then(r=>r.json()).then(d => {
         const p = (d.data || []).find((x: ProjectItem) => x.id === projectId);
         if (p) setForm({ projectName: p.projectName, programTitle: p.programTitle || "", ownerOrgId: p.ownerOrg?.id || "", startJalali: p.startJalali || "", endJalali: p.endJalali || "", priority: "NORMAL", status: p.status, progressPercent: p.progressPercent, goal: "", description: "" });
       });
@@ -127,7 +127,7 @@ function ProjectDialog({ orgs, projectId, onClose, onSaved }: { orgs: Org[]; pro
     try {
       const url = projectId ? `/api/admin/projects/${projectId}` : "/api/admin/projects";
       const method = projectId ? "PATCH" : "POST";
-      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, ownerOrgId: form.ownerOrgId || undefined }) });
+      const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, ownerOrgId: form.ownerOrgId || undefined }), credentials: "include" });
       if (res.ok) { toast.success(projectId ? "به‌روزرسانی شد" : "ایجاد شد"); onSaved(); }
       else { const e = await res.json(); toast.error(e.error?.message || "خطا"); }
     } finally { setSaving(false); }

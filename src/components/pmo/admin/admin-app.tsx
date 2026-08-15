@@ -45,7 +45,7 @@ export function AdminApp({ onExit }: { onExit: () => void }) {
   const [refLabel, setRefLabel] = useState("");
 
   useEffect(() => {
-    fetch("/api/system/settings").then(r => r.json()).then(s => setRefLabel(s.dayLabel || s.monthLabel)).catch(() => {});
+    fetch("/api/system/settings", { credentials: "include" }).then(r => r.json()).then(s => setRefLabel(s.dayLabel || s.monthLabel)).catch(() => {});
   }, []);
 
   const changeView = useCallback((v: AdminView) => { setView(v); setMobileOpen(false); setEditUserId(null); }, []);
@@ -74,7 +74,23 @@ export function AdminApp({ onExit }: { onExit: () => void }) {
               </span>
             )}
             <ThemeToggle />
-            <Button variant="ghost" size="icon" onClick={async () => { await signOut({ redirect: false }); onExit(); }} title="خروج"><LogOut className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" onClick={async () => {
+              // Manual signout — fetch the signout endpoint to clear the cookie
+              try {
+                const csrfRes = await fetch("/api/auth/csrf", { credentials: "include" });
+                const { csrfToken } = await csrfRes.json();
+                await fetch("/api/auth/signout", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams({ csrfToken, callbackUrl: window.location.origin + "/", json: "true" }).toString(),
+                  credentials: "include",
+                });
+                // Wait for cookie to clear, then reload
+                await new Promise((r) => setTimeout(r, 300));
+              } catch (e) {}
+              onExit();
+              window.location.href = "/";
+            }} title="خروج"><LogOut className="h-4 w-4" /></Button>
           </div>
         </div>
       </header>

@@ -20,7 +20,8 @@ const updateSchema = z.object({
   progressPercent: z.number().min(0).max(100).optional(),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await getCurrentUser();
   if (!user) return Response.json({ error: { code: "UNAUTHORIZED" } }, { status: 401 });
   if (user.role !== "ADMIN") return Response.json({ error: { code: "FORBIDDEN" } }, { status: 403 });
@@ -32,27 +33,28 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return Response.json({ error: { code: "VALIDATION", message: "ورودی نامعتبر", details: e as object } }, { status: 422 });
   }
 
-  const old = await db.task.findUnique({ where: { id: params.id } });
+  const old = await db.task.findUnique({ where: { id: id } });
   if (!old) return Response.json({ error: { code: "NOT_FOUND" } }, { status: 404 });
 
-  await db.task.update({ where: { id: params.id }, data: { ...body, updatedBy: user.id } });
+  await db.task.update({ where: { id: id }, data: { ...body, updatedBy: user.id } });
 
-  await audit({ userId: user.id, entityType: "TASK", entityId: params.id, action: "UPDATE", oldValue: old, newValue: body });
+  await audit({ userId: user.id, entityType: "TASK", entityId: id, action: "UPDATE", oldValue: old, newValue: body });
 
-  return Response.json({ data: { id: params.id, updated: true } });
+  return Response.json({ data: { id: id, updated: true } });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await getCurrentUser();
   if (!user) return Response.json({ error: { code: "UNAUTHORIZED" } }, { status: 401 });
   if (user.role !== "ADMIN") return Response.json({ error: { code: "FORBIDDEN" } }, { status: 403 });
 
-  const old = await db.task.findUnique({ where: { id: params.id } });
+  const old = await db.task.findUnique({ where: { id: id } });
   if (!old) return Response.json({ error: { code: "NOT_FOUND" } }, { status: 404 });
 
-  await db.task.delete({ where: { id: params.id } });
+  await db.task.delete({ where: { id: id } });
 
-  await audit({ userId: user.id, entityType: "TASK", entityId: params.id, action: "DELETE", oldValue: { taskName: old.taskName } });
+  await audit({ userId: user.id, entityType: "TASK", entityId: id, action: "DELETE", oldValue: { taskName: old.taskName } });
 
-  return Response.json({ data: { id: params.id, deleted: true } });
+  return Response.json({ data: { id: id, deleted: true } });
 }

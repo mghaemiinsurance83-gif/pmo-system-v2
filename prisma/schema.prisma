@@ -304,9 +304,12 @@ model TaskProgressHistory {
   org                      Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
   reportDate               DateTime
   reportJalali             String?
+  forYear                  Int? // Persian year (e.g. 1405)
+  forMonth                 Int? // Persian month 1-12 (for which month the progress is reported)
   progressPercent          Float        @default(0)
   plannedProgressPercent   Float        @default(0)
   actualProgressPercent    Float        @default(0)
+  status                   String? // snapshot of task status at the time of recording
   comment                  String?
   recordedById             String?
   recordedBy               User?        @relation(fields: [recordedById], references: [id], onDelete: SetNull)
@@ -314,6 +317,7 @@ model TaskProgressHistory {
 
   @@index([taskId, reportDate])
   @@index([orgId])
+  @@index([forYear, forMonth])
 }
 
 // =============================================================================

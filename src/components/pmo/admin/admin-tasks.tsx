@@ -37,18 +37,18 @@ export function AdminTasks() {
   const load = () => {
     const sig = ++reqId.current;
     const params = new URLSearchParams({ page: String(page), pageSize: "20", ...(search && { search }) });
-    fetch(`/api/portal/tasks?${params}`)
+    fetch(`/api/portal/tasks?${params}`, { credentials: "include" })
       .then(r => r.json())
       .then(d => { if (reqId.current === sig) { setItems(d.data || []); setTotalPages(d.meta?.totalPages ?? 1); setTotal(d.meta?.total ?? 0); setLoading(false); } })
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { fetch("/api/admin/projects?pageSize=1000").then(r=>r.json()).then(d=>setProjects((d.data||[]).map((p:any)=>({id:p.id, projectName:p.projectName})))).catch(()=>{}); }, []);
+  useEffect(() => { fetch("/api/admin/projects?pageSize=1000", { credentials: "include" }).then(r=>r.json()).then(d=>setProjects((d.data||[]).map((p:any)=>({id:p.id, projectName:p.projectName})))).catch(()=>{}); }, []);
   useEffect(load, [page, search]);
 
   async function del(id: string) {
     if (!confirm("حذف این گام؟")) return;
-    const res = await fetch(`/api/admin/tasks/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/tasks/${id}`, { method: "DELETE", credentials: "include" });
     if (res.ok) { toast.success("حذف شد"); load(); }
   }
 
@@ -112,7 +112,7 @@ function CreateTaskDialog({ projects, onClose, onSaved }: { projects: ProjectOpt
   async function submit() {
     setSaving(true);
     try {
-      const res = await fetch("/api/admin/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      const res = await fetch("/api/admin/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form), credentials: "include" });
       if (res.ok) { toast.success("گام ایجاد شد"); onSaved(); }
       else { const e = await res.json(); toast.error(e.error?.message || "خطا"); }
     } finally { setSaving(false); }

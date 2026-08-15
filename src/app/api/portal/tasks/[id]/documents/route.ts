@@ -4,11 +4,11 @@ import { getCurrentUserWithScope, canEdit } from "@/lib/rbac";
 import { saveFile, validateFile } from "@/lib/storage";
 import { audit } from "@/lib/audit";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { user, scope } = await getCurrentUserWithScope();
   if (!user) return Response.json({ error: { code: "UNAUTHORIZED" } }, { status: 401 });
 
-  const taskId = params.id;
+  const { id: taskId } = await params;
   const task = await db.task.findUnique({
     where: { id: taskId },
     select: { project: { select: { ownerOrgId: true, unitLinks: { select: { orgId: true } } } } },
@@ -44,13 +44,13 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   return Response.json({ data: docs });
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { user, scope } = await getCurrentUserWithScope();
   if (!user) return Response.json({ error: { code: "UNAUTHORIZED" } }, { status: 401 });
   if (!canEdit(user.role))
     return Response.json({ error: { code: "FORBIDDEN", message: "اجازه آپلود ندارید" } }, { status: 403 });
 
-  const taskId = params.id;
+  const { id: taskId } = await params;
   const task = await db.task.findUnique({
     where: { id: taskId },
     select: { id: true, projectId: true, project: { select: { ownerOrgId: true, unitLinks: { select: { orgId: true } } } } },

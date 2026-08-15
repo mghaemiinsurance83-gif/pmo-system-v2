@@ -54,11 +54,11 @@ export function PortalApp({ onExit }: { onExit: () => void }) {
   const [refLabel, setRefLabel] = useState("");
 
   useEffect(() => {
-    fetch("/api/system/settings")
+    fetch("/api/system/settings", { credentials: "include" })
       .then((r) => r.json())
       .then((s) => setRefLabel(s.dayLabel || s.monthLabel))
       .catch(() => {});
-    fetch("/api/portal/notifications")
+    fetch("/api/portal/notifications", { credentials: "include" })
       .then((r) => r.json())
       .then((n) => setUnread(n.meta?.unread ?? 0))
       .catch(() => {});
@@ -106,7 +106,21 @@ export function PortalApp({ onExit }: { onExit: () => void }) {
               )}
             </Button>
             <ThemeToggle />
-            <Button variant="ghost" size="icon" onClick={async () => { await signOut({ redirect: false }); onExit(); }} title="خروج">
+            <Button variant="ghost" size="icon" onClick={async () => {
+              try {
+                const csrfRes = await fetch("/api/auth/csrf", { credentials: "include" });
+                const { csrfToken } = await csrfRes.json();
+                await fetch("/api/auth/signout", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams({ csrfToken, callbackUrl: window.location.origin + "/", json: "true" }).toString(),
+                  credentials: "include",
+                });
+                await new Promise((r) => setTimeout(r, 300));
+              } catch (e) {}
+              onExit();
+              window.location.href = "/";
+            }} title="خروج">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>

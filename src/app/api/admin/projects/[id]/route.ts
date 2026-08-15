@@ -18,7 +18,8 @@ const updateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await getCurrentUser();
   if (!user) return Response.json({ error: { code: "UNAUTHORIZED" } }, { status: 401 });
   if (user.role !== "ADMIN") return Response.json({ error: { code: "FORBIDDEN" } }, { status: 403 });
@@ -30,28 +31,29 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return Response.json({ error: { code: "VALIDATION", message: "ورودی نامعتبر", details: e as object } }, { status: 422 });
   }
 
-  const old = await db.project.findUnique({ where: { id: params.id } });
+  const old = await db.project.findUnique({ where: { id: id } });
   if (!old) return Response.json({ error: { code: "NOT_FOUND" } }, { status: 404 });
 
-  await db.project.update({ where: { id: params.id }, data: { ...body, updatedBy: user.id } });
+  await db.project.update({ where: { id: id }, data: { ...body, updatedBy: user.id } });
 
-  await audit({ userId: user.id, entityType: "PROJECT", entityId: params.id, action: "UPDATE", oldValue: old, newValue: body });
+  await audit({ userId: user.id, entityType: "PROJECT", entityId: id, action: "UPDATE", oldValue: old, newValue: body });
 
-  return Response.json({ data: { id: params.id, updated: true } });
+  return Response.json({ data: { id: id, updated: true } });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await getCurrentUser();
   if (!user) return Response.json({ error: { code: "UNAUTHORIZED" } }, { status: 401 });
   if (user.role !== "ADMIN") return Response.json({ error: { code: "FORBIDDEN" } }, { status: 403 });
 
-  const old = await db.project.findUnique({ where: { id: params.id } });
+  const old = await db.project.findUnique({ where: { id: id } });
   if (!old) return Response.json({ error: { code: "NOT_FOUND" } }, { status: 404 });
 
   // Soft delete
-  await db.project.update({ where: { id: params.id }, data: { isActive: false } });
+  await db.project.update({ where: { id: id }, data: { isActive: false } });
 
-  await audit({ userId: user.id, entityType: "PROJECT", entityId: params.id, action: "DELETE", oldValue: { projectName: old.projectName } });
+  await audit({ userId: user.id, entityType: "PROJECT", entityId: id, action: "DELETE", oldValue: { projectName: old.projectName } });
 
-  return Response.json({ data: { id: params.id, deactivated: true } });
+  return Response.json({ data: { id: id, deactivated: true } });
 }
