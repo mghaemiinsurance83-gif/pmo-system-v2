@@ -3,6 +3,7 @@ import { Vazirmatn } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Providers } from "@/components/providers";
 
 const vazirmatn = Vazirmatn({
   subsets: ["arabic", "latin"],
@@ -13,13 +14,14 @@ const vazirmatn = Vazirmatn({
 export const metadata: Metadata = {
   title: "سامانه مدیریت برنامه‌های سازمانی | ۱۴۰۵",
   description:
-    "سامانه یکپارچه مدیریت پروژه و برنامه‌های عملیاتی سازمان — درخت پروژه، نمودار گانت، پیشرفت وزنی، فرهنگ‌نامه واحدها و داشبورد مدیریتی",
+    "سامانه یکپارچه مدیریت پروژه و برنامه‌های عملیاتی سازمان — احراز هویت، پورتال واحدها، گام‌های کاری، مستندات و داشبورد مدیریتی",
   keywords: [
     "مدیریت پروژه",
     "برنامه عملیاتی",
     "گانت چارت",
     "پیشرفت وزنی",
-    "فرهنگ‌نامه سازمانی",
+    "پورتال واحدها",
+    "احراز هویت",
   ],
   authors: [{ name: "Organizational PMO" }],
 };
@@ -40,7 +42,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <Providers>
+            {children}
+          </Providers>
           <Toaster />
         </ThemeProvider>
       </body>

@@ -39,6 +39,9 @@ model Organization {
   projectAssignments ProjectUnit[]
   taskAssignments    TaskUnit[]
   progressRecords    TaskProgressHistory[]
+  users              User[]            @relation("UserOrg")
+  liaisonUsers       UserLiaisonOrg[]
+  documents          Document[]
 
   @@index([parentOrgId])
   @@index([orgType])
@@ -100,20 +103,52 @@ model StatusDictionary {
 }
 
 // =============================================================================
-// 5. USER — for audit + ownership.
+// 5. USER — for auth + audit + ownership.
+//    Extended for AD integration: username, orgId, role (ADMIN|MANAGER|LIAISON|VIEWER).
 // =============================================================================
 model User {
-  id        String         @id @default(cuid())
-  email     String         @unique
-  name      String
-  role      String         @default("VIEWER") // ADMIN | MANAGER | EDITOR | VIEWER
-  isActive  Boolean        @default(true)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id              String         @id @default(cuid())
+  username        String         @unique // sAMAccountName from AD (or local login handle)
+  email           String?        @unique // may be null if AD has no mail
+  name            String // displayName from AD
+  role            String         @default("VIEWER") // ADMIN | MANAGER | LIAISON | VIEWER
+  orgId           String? // primary Organization (department) of user
+  org             Organization?  @relation("UserOrg", fields: [orgId], references: [id], onDelete: SetNull)
+  isActive        Boolean        @default(true)
+  lastLoginAt     DateTime?
+  authSource      String         @default("LOCAL") // AD | LOCAL
+  adDistinguishedName String?
+  adSyncedAt      DateTime?
+  passwordHash    String? // only for LOCAL auth (bcrypt); null for AD users
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   responsibleForOrg Organization[]         @relation("OrgResponsible")
+  liaisonOrgs       UserLiaisonOrg[]
   progressRecords   TaskProgressHistory[]
   auditLogs         AuditLog[]
+  documents         Document[]              @relation("DocUploader")
+  notifications     Notification[]
+
+  @@index([orgId])
+  @@index([role])
+}
+
+// =============================================================================
+// 5b. USER LIAISON ORG — many-to-many User ↔ Organization (liaison assignments).
+//     Allows one user to be liaison for multiple orgs beyond their primary orgId.
+// =============================================================================
+model UserLiaisonOrg {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  assignedAt DateTime     @default(now())
+  assignedBy String?
+
+  @@unique([userId, orgId])
+  @@index([orgId])
 }
 
 // =============================================================================
@@ -152,6 +187,7 @@ model Project {
   tasks        Task[]
   unitLinks    ProjectUnit[]
   progressLogs ProjectProgressHistory[]
+  documents    Document[]
 
   @@index([ownerOrgId])
   @@index([parentProjectId])
@@ -215,6 +251,7 @@ model Task {
   depsAsPredecessor TaskDependency[] @relation("DepPredecessor")
   depsAsSuccessor   TaskDependency[] @relation("DepSuccessor")
   progressHistory TaskProgressHistory[]
+  documents      Document[]
 
   @@index([projectId])
   @@index([parentTaskId])
@@ -395,4 +432,85 @@ model RawProgramRow {
 
   @@index([sheetImportId])
   @@index([mappingStatus])
+}
+
+// =============================================================================
+// 17. DOCUMENT — files uploaded for task progress evidence.
+//     Uploaded by LIAISON/MANAGER, attached to a Task for a specific month.
+// =============================================================================
+model Document {
+  id              String       @id @default(cuid())
+  taskId          String
+  task            Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  projectId       String
+  project         Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  orgId           String?
+  org             Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+
+  // File metadata
+  originalFileName String
+  storedFileName   String // hashed name on disk
+  mimeType         String
+  sizeBytes        Int
+  storagePath      String // absolute path on disk
+
+  // Time range this document covers
+  forMonth         Int?    // 1..12 (Jalali month)
+  forJalali        String? // "1405/05"
+
+  // Description
+  title            String?
+  description      String?
+
+  // Uploader
+  uploadedById     String?
+  uploadedBy       User?   @relation("DocUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+  uploadedAt       DateTime @default(now())
+
+  // Soft delete + versioning
+  isActive         Boolean  @default(true)
+  version          Int      @default(1)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([taskId, forMonth])
+  @@index([projectId])
+  @@index([orgId])
+  @@index([uploadedById])
+}
+
+// =============================================================================
+// 18. NOTIFICATION — in-app notifications for users.
+// =============================================================================
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  type      String   // DOC_UPLOADED | PROGRESS_UPDATED | ROLE_ASSIGNED | SYSTEM | ...
+  link      String?  // client-side route/view reference
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// 19. AUTH EVENT — login/logout audit trail.
+// =============================================================================
+model AuthEvent {
+  id         String   @id @default(cuid())
+  userId     String?
+  username   String
+  action     String   // LOGIN_SUCCESS | LOGIN_FAILED | LOGOUT
+  ipAddress  String?
+  userAgent  String?
+  errorReason String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }

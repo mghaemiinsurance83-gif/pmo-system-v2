@@ -279,10 +279,39 @@ async function main() {
   await db.organization.deleteMany();
   await db.user.deleteMany();
 
-  // 1. Default admin user
+  // 1. Default admin user (LOCAL auth, password: admin123)
+  const bcrypt = await import("bcryptjs");
   const admin = await db.user.create({
-    data: { email: "admin@pmo.local", name: "مدیر سیستم", role: "ADMIN" },
+    data: {
+      username: "admin",
+      email: "admin@pmo.local",
+      name: "مدیر سیستم",
+      role: "ADMIN",
+      authSource: "LOCAL",
+      passwordHash: bcrypt.hashSync("admin123", 12),
+    },
   });
+
+  // 1b. Demo manager + liaison users (LOCAL auth)
+  const demoUsers = [
+    { username: "manager1", name: "مدیر امور مشتریان", role: "MANAGER", orgCode: "M-016" },
+    { username: "manager2", name: "مدیر امور شعب", role: "MANAGER", orgCode: "M-015" },
+    { username: "liaison1", name: "رابط امور مشتریان", role: "LIAISON", orgCode: "M-016" },
+    { username: "liaison2", name: "رابط مالی", role: "LIAISON", orgCode: "M-014" },
+  ];
+  for (const du of demoUsers) {
+    const org = await db.organization.findFirst({ where: { code: du.orgCode } });
+    await db.user.create({
+      data: {
+        username: du.username,
+        name: du.name,
+        role: du.role,
+        orgId: org?.id,
+        authSource: "LOCAL",
+        passwordHash: bcrypt.hashSync("123456", 12),
+      },
+    });
+  }
 
   // 2. Status dictionary
   const statuses = [
