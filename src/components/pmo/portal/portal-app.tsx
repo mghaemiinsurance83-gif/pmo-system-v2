@@ -78,7 +78,7 @@ export function PortalApp({ onExit }: { onExit: () => void }) {
       {/* Top bar */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
-          <button className="lg:hidden -mr-1 inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent" onClick={() => setMobileOpen((o) => !o)} aria-label="منو">
+          <button type="button" className="lg:hidden -mr-1 inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent" onClick={() => setMobileOpen((o) => !o)} aria-label="منو">
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <div className="flex items-center gap-2.5 min-w-0">
@@ -135,7 +135,7 @@ export function PortalApp({ onExit }: { onExit: () => void }) {
               const Icon = item.icon;
               const active = view === item.id;
               return (
-                <button key={item.id} onClick={() => changeView(item.id)} className={cn("group flex items-start gap-3 rounded-lg px-3 py-2.5 text-right transition-colors", active ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-sidebar-accent text-sidebar-foreground")}>
+                <button key={item.id} type="button" onClick={() => changeView(item.id)} className={cn("group flex items-start gap-3 rounded-lg px-3 py-2.5 text-right transition-colors", active ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-sidebar-accent text-sidebar-foreground")}>
                   <Icon className={cn("h-4 w-4 mt-0.5 shrink-0", active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground")} />
                   <div className="min-w-0">
                     <div className="text-sm font-medium leading-tight">{item.label}</div>

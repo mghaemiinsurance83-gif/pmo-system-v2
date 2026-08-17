@@ -99,9 +99,13 @@ export default function Home() {
     getSession().catch(() => {});
   }, [mode]); // re-check when mode changes (e.g., after login)
 
-  // Loading state — wait until BOTH useSession and direct fetch have been checked
-  // to avoid flashing the public dashboard before the session is confirmed
-  if (!sessionChecked && status === "loading") {
+  // Loading state — wait until session check has completed before rendering
+  // anything. This is the single most important guard: it prevents the
+  // public dashboard (with all 163 projects) from briefly flashing before
+  // the portal is rendered after login.
+  // sessionChecked is set to true once our direct fetch to /api/auth/session
+  // completes (success or failure). Until then, show a neutral loading screen.
+  if (!sessionChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-muted-foreground">در حال بارگذاری...</div>
@@ -134,7 +138,7 @@ export default function Home() {
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
-          <button className="lg:hidden -mr-1 inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent" onClick={() => setMobileOpen((o) => !o)} aria-label="منو">
+          <button type="button" className="lg:hidden -mr-1 inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-accent" onClick={() => setMobileOpen((o) => !o)} aria-label="منو">
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
           <div className="flex items-center gap-2.5 min-w-0">
@@ -169,7 +173,7 @@ export default function Home() {
               const Icon = item.icon;
               const active = view === item.id;
               return (
-                <button key={item.id} onClick={() => changeView(item.id)} className={cn("group flex items-start gap-3 rounded-lg px-3 py-2.5 text-right transition-colors", active ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-sidebar-accent text-sidebar-foreground")}>
+                <button key={item.id} type="button" onClick={() => changeView(item.id)} className={cn("group flex items-start gap-3 rounded-lg px-3 py-2.5 text-right transition-colors", active ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-sidebar-accent text-sidebar-foreground")}>
                   <Icon className={cn("h-4 w-4 mt-0.5 shrink-0", active ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground")} />
                   <div className="min-w-0">
                     <div className="text-sm font-medium leading-tight">{item.label}</div>

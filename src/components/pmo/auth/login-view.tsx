@@ -68,10 +68,17 @@ export function LoginView({ onSuccess, onCancel }: Props) {
         return;
       }
       if (result?.ok) {
-        // Success — hard reload so SessionProvider picks up the new cookie
-        onSuccess?.();
-        // Small delay to ensure cookie is committed, then reload
-        setTimeout(() => window.location.reload(), 100);
+        // Success — hard reload IMMEDIATELY so SessionProvider picks up the
+        // new cookie on the fresh page load. We intentionally do NOT call
+        // onSuccess() here, because that would flip mode="portal" in the
+        // parent before the session is actually in the parent's state —
+        // causing PortalApp to mount with an empty session, which briefly
+        // renders the public dashboard (163 projects) before the portal.
+        // Reloading is the cleanest way to re-initialize the session state.
+        setLoading(false);
+        // assign window.location.href via setTimeout(0) so the current
+        // event handler completes before navigation starts.
+        setTimeout(() => { window.location.href = "/"; }, 0);
         return;
       }
       // Fallback: unknown state
