@@ -88,13 +88,19 @@ export default function Home() {
         if (u && mode === "public") {
           setMode("portal");
         }
+        // If session check returned empty but we thought we were in portal mode,
+        // fall back to public (e.g. stale cookie that can't be decoded)
+        if (!u && mode === "portal") {
+          setMode("public");
+        }
       })
       .catch(() => setSessionChecked(true));
     // Also try to refresh useSession cache
     getSession().catch(() => {});
   }, [mode]); // re-check when mode changes (e.g., after login)
 
-  // Loading state
+  // Loading state — wait until BOTH useSession and direct fetch have been checked
+  // to avoid flashing the public dashboard before the session is confirmed
   if (!sessionChecked && status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

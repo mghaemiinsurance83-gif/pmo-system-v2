@@ -1,6 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,15 @@ export function LoginView({ onSuccess, onCancel }: Props) {
 
     setLoading(true);
     try {
+      // Clear any stale session cookie first (e.g. from before NEXTAUTH_SECRET was set).
+      // signOut with redirect:false makes a POST to /api/auth/signout which clears the cookie,
+      // then we immediately signIn with the new credentials. This ensures a clean session.
+      try {
+        await signOut({ redirect: false });
+      } catch {
+        // ignore — if there was no session, signOut is a no-op
+      }
+
       // signIn from next-auth/react handles CSRF + cookie + everything automatically.
       // redirect: false returns a result object instead of redirecting.
       const result = await signIn("credentials", {
