@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import type { Session } from "next-auth";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getServerSessionCompat } from "@/lib/auth";
 
 export type Role = "ADMIN" | "MANAGER" | "LIAISON" | "VIEWER";
 
@@ -19,11 +18,11 @@ export interface AuthUser {
 
 /**
  * Get current authenticated user from server session.
+ * Uses the Next.js 16 compat reader (next-auth v4's getServerSession is
+ * broken on Next 16 because cookies()/headers() are now async).
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const session = (await getServerSession(authOptions)) as (Session & {
-    user?: AuthUser;
-  }) | null;
+  const session = await getServerSessionCompat();
   if (!session?.user?.id) return null;
   return session.user;
 }

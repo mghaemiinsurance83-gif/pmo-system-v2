@@ -64,6 +64,13 @@ db/*.db-journal
 /upload/
 /download/
 
+# user-uploaded documents (runtime storage)
+/storage/
+
+# dev server log
+dev.log
+server.log
+
 # tool results / temp
 tool-results/
 *.txt.bak
